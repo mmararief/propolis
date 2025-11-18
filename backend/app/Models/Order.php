@@ -37,6 +37,10 @@ class Order extends Model
         'metode_pembayaran',
         'bukti_pembayaran',
         'resi',
+        'tracking_status',
+        'tracking_payload',
+        'tracking_last_checked_at',
+        'tracking_completed_at',
         'reservation_expires_at',
         'ordered_at',
         'gross_revenue',
@@ -57,6 +61,9 @@ class Order extends Model
         'gross_revenue' => 'decimal:2',
         'net_revenue' => 'decimal:2',
         'discount' => 'decimal:2',
+        'tracking_payload' => 'array',
+        'tracking_last_checked_at' => 'datetime',
+        'tracking_completed_at' => 'datetime',
     ];
 
     public function user()

@@ -54,6 +54,17 @@ const AdminOrdersPage = () => {
     }
   };
 
+  const markDelivered = async (id) => {
+    if (!window.confirm('Tandai pesanan ini sudah diterima pelanggan?')) return;
+    try {
+      await api.post(`/admin/orders/${id}/mark-delivered`);
+      setMessage(`Order #${id} ditandai selesai`);
+      fetchOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Gagal menandai pesanan');
+    }
+  };
+
   const openDetailModal = (orderId) => {
     setSelectedOrderId(orderId);
     setIsDetailModalOpen(true);
@@ -299,6 +310,15 @@ const AdminOrdersPage = () => {
                             Kirim
                           </button>
                         )}
+                        {order.status === 'dikirim' && (
+                          <button
+                            type="button"
+                            className="btn-primary px-3 py-1 text-xs bg-green-600 hover:bg-green-700"
+                            onClick={() => markDelivered(order.id)}
+                          >
+                            Tandai Selesai
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -314,6 +334,7 @@ const AdminOrdersPage = () => {
         orderId={selectedOrderId}
         isOpen={isDetailModalOpen}
         onClose={closeDetailModal}
+        onStatusUpdated={fetchOrders}
       />
     </div>
   );

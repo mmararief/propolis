@@ -120,6 +120,11 @@ const CheckoutPage = () => {
       return;
     }
 
+    if (!selectedService || !form.courier_service) {
+      setError('Silakan hitung ongkir dan pilih layanan pengiriman terlebih dahulu.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -386,7 +391,7 @@ const CheckoutPage = () => {
                     Pilih Ekspedisi:
                   </label>
                   <div className="grid grid-cols-3 gap-3">
-                    {['JNE', 'POS', 'TIKI'].map((courier) => (
+                    {['JNE', 'WAHANA', 'LION'].map((courier) => (
                       <button
                         key={courier}
                         type="button"
@@ -568,17 +573,22 @@ const CheckoutPage = () => {
 
             {/* Right Column - Order Button */}
             <div className="lg:w-80">
-              <div className="bg-white rounded-lg shadow-md p-6 sticky top-[120px]">
+              <div className="bg-white rounded-lg shadow-md p-6 sticky top-[120px] space-y-3">
+                {!selectedService && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                    Hitung ongkir dan pilih layanan kurir terlebih dahulu untuk melanjutkan.
+                  </div>
+                )}
                 <button
                   type="submit"
-                  disabled={loading || shippingLoading}
+                  disabled={loading || shippingLoading || !selectedService || !form.courier_service}
                   className="w-full py-3 rounded-lg font-ui font-semibold text-[16px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: '#D2001A' }}
                 >
                   {loading ? 'Memproses...' : 'Buat Pesanan'}
                 </button>
                 {error && (
-                  <p className="text-red-500 text-sm font-ui mt-4">{error}</p>
+                  <p className="text-red-500 text-sm font-ui">{error}</p>
                 )}
               </div>
             </div>

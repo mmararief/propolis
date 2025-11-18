@@ -185,6 +185,38 @@
                 ]
             }
         },
+        "/admin/orders/{id}/mark-delivered": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Tandai pesanan sudah diterima pelanggan",
+                "operationId": "0d6122a806eb85a4dc23dd851ed32d8e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order ditandai selesai"
+                    },
+                    "422": {
+                        "description": "Status tidak valid untuk diselesaikan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/admin/run-reservation-release": {
             "post": {
                 "tags": [
@@ -744,6 +776,44 @@
                     },
                     "403": {
                         "description": "Tidak berhak mengakses order ini"
+                    },
+                    "404": {
+                        "description": "Order tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/orders/{id}/confirm-delivery": {
+            "post": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Konfirmasi pesanan sudah diterima pelanggan",
+                "operationId": "8443c77944c1cfdb476f30f932261a45",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pesanan ditandai selesai"
+                    },
+                    "403": {
+                        "description": "Tidak berhak mengubah order ini"
+                    },
+                    "422": {
+                        "description": "Status order tidak valid"
                     },
                     "404": {
                         "description": "Order tidak ditemukan"

@@ -42,4 +42,11 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    'tracking' => [
+        'binderbyte_api_key' => env('BINDERBYTE_API_KEY'),
+        'default_courier' => env('TRACKING_DEFAULT_COURIER', 'jne'),
+        'refresh_interval_hours' => env('TRACKING_REFRESH_INTERVAL_HOURS', 12),
+        'sync_batch_limit' => env('TRACKING_SYNC_LIMIT', 50),
+    ],
+
 ];

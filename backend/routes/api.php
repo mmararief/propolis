@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/me', [OrderController::class, 'index']);
     Route::post('/orders/{id}/upload-proof', [PaymentController::class, 'uploadProof']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::post('/orders/{id}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
 });
 
 Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
@@ -66,6 +67,7 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::get('/admin/orders/{id}', [AdminOrderController::class, 'show']);
     Route::post('/admin/orders/{id}/verify-payment', [AdminOrderController::class, 'verifyPayment']);
     Route::post('/admin/orders/{id}/ship', [AdminOrderController::class, 'ship']);
+    Route::post('/admin/orders/{id}/mark-delivered', [AdminOrderController::class, 'markDelivered']);
     Route::post('/admin/run-reservation-release', [AdminOrderController::class, 'runReservationRelease']);
 
     Route::get('/reports/batch-stock', [ReportController::class, 'batchStock']);

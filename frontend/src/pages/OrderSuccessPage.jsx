@@ -261,6 +261,20 @@ const OrderSuccessPage = () => {
 
   const steps = getProgressSteps(order);
   const subtotal = order.total - (order.ongkos_kirim || 0);
+  const trackingSummary = order?.tracking_payload?.summary;
+  const trackingHistory = Array.isArray(order?.tracking_payload?.history)
+    ? order.tracking_payload.history
+    : [];
+
+  // Hitung seberapa jauh progress untuk garis utama
+  const lastCompletedIndex = steps.reduce(
+    (acc, step, index) => (step.completed ? index : acc),
+    -1
+  );
+  const completedWidthPercent =
+    steps.length > 1 && lastCompletedIndex > 0
+      ? (lastCompletedIndex / (steps.length - 1)) * 100
+      : 0;
 
   return (
     <div className="relative bg-white min-h-screen overflow-x-hidden pt-[100px] pb-20">
@@ -307,16 +321,34 @@ const OrderSuccessPage = () => {
           </div>
 
           {/* Progress Bar */}
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              {steps.map((step, index) => (
-                <div key={step.id} className="flex-1 flex items-center">
-                  <div className="flex flex-col items-center flex-1">
+          <div className="relative py-6 px-12">
+            {/* Container untuk garis yang dibatasi */}
+            <div className="relative">
+              {/* Garis dasar (abu) - hanya antar bulatan */}
+              <div 
+                className="absolute top-10 h-1 bg-gray-200" 
+                style={{ 
+                  left: '40px',
+                  right: '40px'
+                }}
+              />
+              {/* Garis progress (merah) */}
+              <div
+                className="absolute top-10 h-1 bg-[#D2001A] transition-all duration-500"
+                style={{ 
+                  left: '40px',
+                  width: `calc(${completedWidthPercent}% - 80px)`
+                }}
+              />
+              {/* Titik status */}
+              <div className="relative flex items-center justify-between">
+                {steps.map((step) => (
+                  <div key={step.id} className="flex flex-col items-center">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
+                      className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 border-4 shadow-md ${
                         step.completed
-                          ? 'text-white'
-                          : 'text-gray-400 bg-gray-100'
+                          ? 'text-white border-[#D2001A]'
+                          : 'text-gray-400 border-gray-300 bg-white'
                       }`}
                       style={
                         step.completed
@@ -327,7 +359,7 @@ const OrderSuccessPage = () => {
                       {step.icon}
                     </div>
                     <p
-                      className={`font-ui font-medium text-xs text-center mb-1 ${
+                      className={`font-ui font-semibold text-sm text-center mb-1 ${
                         step.completed ? 'text-gray-900' : 'text-gray-400'
                       }`}
                     >
@@ -339,22 +371,8 @@ const OrderSuccessPage = () => {
                       </p>
                     )}
                   </div>
-                  {index < steps.length - 1 && (
-                    <div
-                      className={`h-0.5 flex-1 mx-2 ${
-                        step.completed
-                          ? 'bg-red-500'
-                          : 'bg-gray-300'
-                      }`}
-                      style={
-                        step.completed
-                          ? { backgroundColor: '#D2001A' }
-                          : {}
-                      }
-                    ></div>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -422,6 +440,65 @@ const OrderSuccessPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Tracking History */}
+        {order.resi && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-ui font-semibold text-gray-900">Riwayat Pengiriman</h2>
+                <p className="text-sm text-gray-500">
+                  Update terakhir: {order.tracking_last_checked_at ? formatDate(order.tracking_last_checked_at) : 'Belum ada'}
+                </p>
+              </div>
+              {order.resi && (
+                <div className="text-right">
+                  <p className="text-xs uppercase text-gray-500">Nomor Resi</p>
+                  <p className="font-mono font-semibold text-gray-900">{order.resi}</p>
+                </div>
+              )}
+            </div>
+            {trackingSummary && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-gray-700">
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Kurir</p>
+                  <p className="font-semibold">{trackingSummary.courier || `${order.courier ?? '-'} ${order.courier_service ?? ''}`}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Layanan</p>
+                  <p className="font-semibold">{trackingSummary.service || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Status Terkini</p>
+                  <p className="font-semibold text-[#D2001A]">{trackingSummary.status || order.tracking_status || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Berat / Biaya</p>
+                  <p className="font-semibold">{trackingSummary.weight || '-'} • {trackingSummary.amount || '-'}</p>
+                </div>
+              </div>
+            )}
+            {trackingHistory.length === 0 ? (
+              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-600">
+                Belum ada riwayat pelacakan. Status akan muncul otomatis setelah kurir memperbarui data.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {trackingHistory.map((entry, index) => (
+                  <div key={`${entry.date}-${index}`} className="flex gap-4">
+                    <div className="w-32 text-xs text-gray-500">{entry.date ? formatDate(entry.date) : '-'}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{entry.desc || '-'}</p>
+                      {entry.location && (
+                        <p className="text-xs text-gray-500 mt-1">{entry.location}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Order Summary */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">

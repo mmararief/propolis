@@ -281,6 +281,40 @@ class AdminOrderController extends Controller
 
     /**
      * @OA\Post(
+     *     path="/admin/orders/{id}/mark-delivered",
+     *     tags={"Admin"},
+     *     summary="Tandai pesanan sudah diterima pelanggan",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Order ditandai selesai"),
+     *     @OA\Response(response=422, description="Status tidak valid untuk diselesaikan")
+     * )
+     */
+    public function markDelivered(Request $request, int $orderId)
+    {
+        $this->authorize('admin');
+
+        $order = Order::findOrFail($orderId);
+
+        if ($order->status === 'selesai') {
+            return $this->success($order, 'Order sudah berstatus selesai');
+        }
+
+        if (! in_array($order->status, ['dikirim', 'diproses', 'menunggu_konfirmasi'], true)) {
+            return $this->fail('Status order tidak valid untuk ditandai selesai', 422);
+        }
+
+        $order->status = 'selesai';
+        $order->tracking_status = $order->tracking_status ?? 'DELIVERED';
+        $order->tracking_last_checked_at = now();
+        $order->tracking_completed_at = now();
+        $order->save();
+
+        return $this->success($order->fresh(), 'Order ditandai selesai');
+    }
+
+    /**
+     * @OA\Post(
      *     path="/admin/run-reservation-release",
      *     tags={"Admin"},
      *     summary="Trigger job pelepasan reservasi stok",

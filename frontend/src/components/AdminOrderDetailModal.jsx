@@ -11,10 +11,12 @@ const channelLabel = {
   lainnya: 'Lainnya',
 };
 
-const AdminOrderDetailModal = ({ orderId, isOpen, onClose }) => {
+const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
 
   const fetchOrderDetail = useCallback(async () => {
     setLoading(true);
@@ -34,6 +36,22 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose }) => {
       fetchOrderDetail();
     }
   }, [fetchOrderDetail, isOpen, orderId]);
+
+  const handleMarkDelivered = async () => {
+    if (!orderId || !order) return;
+    if (!window.confirm('Tandai pesanan ini selesai?')) return;
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      await api.post(`/admin/orders/${orderId}/mark-delivered`);
+      await fetchOrderDetail();
+      onStatusUpdated?.();
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message || 'Gagal menandai pesanan');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -64,6 +82,12 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose }) => {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-red-600">{error}</p>
+            </div>
+          )}
+
+          {actionError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-600">{actionError}</p>
             </div>
           )}
 
@@ -291,13 +315,22 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 flex justify-end">
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
           <button
             onClick={onClose}
             className="btn-outline"
           >
             Tutup
           </button>
+          {order && order.status === 'dikirim' && (
+            <button
+              onClick={handleMarkDelivered}
+              className="btn-primary bg-green-600 hover:bg-green-700 disabled:opacity-60"
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Memproses...' : 'Tandai Selesai'}
+            </button>
+          )}
         </div>
       </div>
     </div>

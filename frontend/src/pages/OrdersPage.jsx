@@ -11,6 +11,7 @@ const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -26,6 +27,7 @@ const OrdersPage = () => {
       const errorMsg = err.response?.data?.message || err.message;
       if (errorMsg && !errorMsg.includes('ID pesanan tidak valid')) {
         setError(errorMsg);
+        setSuccessMessage(null);
       } else {
         setError(null);
         setOrders([]);
@@ -67,6 +69,18 @@ const OrdersPage = () => {
     return statusMap[status] || status.replace('_', ' ');
   };
 
+  const confirmDelivery = async (orderId) => {
+    if (!window.confirm('Pesanan sudah diterima?')) return;
+    try {
+      await api.post(`/orders/${orderId}/confirm-delivery`);
+      setSuccessMessage('Terima kasih! Pesanan ditandai selesai.');
+      setError(null);
+      fetchOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Gagal mengkonfirmasi pesanan');
+    }
+  };
+
   return (
     <div className="relative bg-white min-h-screen overflow-x-hidden pt-[100px] pb-20">
       <div className="relative w-full max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-[150px] pt-16">
@@ -106,6 +120,12 @@ const OrdersPage = () => {
                 {Array.from({ length: 3 }).map((_, index) => (
                   <SkeletonOrderCard key={index} />
                 ))}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">
+                {successMessage}
               </div>
             )}
 
@@ -204,6 +224,15 @@ const OrdersPage = () => {
                         >
                           Hubungi Admin
                         </button>
+                        {order.status === 'dikirim' && (
+                          <button
+                            onClick={() => confirmDelivery(order.id)}
+                            className="px-6 py-2 rounded-lg font-ui font-semibold text-[14px] text-white hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: '#0B9D58' }}
+                          >
+                            Konfirmasi Diterima
+                          </button>
+                        )}
                         <Link
                           to={`/orders/success/${order.id}`}
                           className="px-6 py-2 rounded-lg font-ui font-semibold text-[14px] text-white hover:opacity-90 transition-opacity"

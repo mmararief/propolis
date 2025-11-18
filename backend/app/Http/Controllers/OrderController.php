@@ -56,4 +56,51 @@ class OrderController extends Controller
 
         return $this->success($order);
     }
+
+    /**
+     * @OA\Post(
+     *     path="/orders/{id}/confirm-delivery",
+     *     tags={"Orders"},
+     *     summary="Konfirmasi pesanan sudah diterima pelanggan",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Pesanan ditandai selesai"),
+     *     @OA\Response(response=403, description="Tidak berhak mengubah order ini"),
+     *     @OA\Response(response=422, description="Status order tidak valid"),
+     *     @OA\Response(response=404, description="Order tidak ditemukan")
+     * )
+     */
+    public function confirmDelivery(Request $request, int $orderId)
+    {
+        if ($orderId <= 0) {
+            return $this->fail('ID pesanan tidak valid', 422);
+        }
+
+        /** @var Order|null $order */
+        $order = Order::find($orderId);
+
+        if (! $order) {
+            return $this->fail('Pesanan tidak ditemukan', 404);
+        }
+
+        if ($order->user_id !== $request->user()->id) {
+            return $this->fail('Anda tidak berhak mengubah pesanan ini', 403);
+        }
+
+        if ($order->status === 'selesai') {
+            return $this->success($order, 'Pesanan sudah berstatus selesai');
+        }
+
+        if ($order->status !== 'dikirim') {
+            return $this->fail('Pesanan belum dalam status pengiriman', 422);
+        }
+
+        $order->status = 'selesai';
+        $order->tracking_status = $order->tracking_status ?? 'CUSTOMER_CONFIRMED';
+        $order->tracking_last_checked_at = now();
+        $order->tracking_completed_at = now();
+        $order->save();
+
+        return $this->success($order, 'Terima kasih! Pesanan sudah ditandai selesai.');
+    }
 }
