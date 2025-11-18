@@ -113,6 +113,20 @@ class BatchAllocationService
         });
     }
 
+    public function releaseAllocation(Order $order): void
+    {
+        DB::transaction(function () use ($order) {
+            $order->loadMissing('items.batches');
+
+            foreach ($order->items as $item) {
+                $this->releaseItemAllocation($item, true);
+            }
+
+            $order->reservation_expires_at = null;
+            $order->save();
+        });
+    }
+
     private function reserveItemBatches(OrderItem $orderItem, int $referenceOrderId): void
     {
         $orderItem = $orderItem->fresh(['batches', 'product']);
@@ -183,6 +197,45 @@ class BatchAllocationService
 
         if ($deleteRows) {
             OrderItemBatch::where('order_item_id', $orderItem->id)->delete();
+        }
+    }
+
+    private function releaseItemAllocation(OrderItem $orderItem, bool $deleteRows): void
+    {
+        $orderItem = $orderItem->fresh(['batches']);
+        if ($orderItem->batches->isEmpty()) {
+            return;
+        }
+
+        $batchIds = $orderItem->batches->pluck('batch_id')->unique();
+        $batches = ProductBatch::whereIn('id', $batchIds)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($orderItem->batches as $allocation) {
+            $batch = $batches->get($allocation->batch_id);
+
+            if (! $batch) {
+                continue;
+            }
+
+            // Jika sudah dialokasikan, kembalikan qty_remaining juga
+            if ($orderItem->allocated) {
+                $batch->qty_remaining += $allocation->qty;
+            }
+
+            // Kembalikan reserved_qty jika masih ada
+            $batch->reserved_qty = max(0, $batch->reserved_qty - $allocation->qty);
+            $batch->save();
+
+            $this->logMovement($batch->id, $allocation->qty, 'cancel', $orderItem->order_id);
+        }
+
+        if ($deleteRows) {
+            OrderItemBatch::where('order_item_id', $orderItem->id)->delete();
+            $orderItem->allocated = false;
+            $orderItem->save();
         }
     }
 

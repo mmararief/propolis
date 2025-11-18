@@ -79,8 +79,17 @@ class Order extends Model
     public function scopeNeedReservationRelease($query)
     {
         return $query->whereIn('status', ['belum_dibayar', 'menunggu_konfirmasi'])
-            ->whereNotNull('reservation_expires_at')
-            ->where('reservation_expires_at', '<', now());
+            ->where(function ($q) {
+                // Order dengan reservation_expires_at yang sudah lewat
+                $q->whereNotNull('reservation_expires_at')
+                    ->where('reservation_expires_at', '<', now());
+            })
+            ->orWhere(function ($q) {
+                // Order yang sudah lebih dari 1 jam dari waktu order dibuat (tanpa reservation_expires_at)
+                $q->whereIn('status', ['belum_dibayar', 'menunggu_konfirmasi'])
+                    ->whereNull('reservation_expires_at')
+                    ->whereRaw('TIMESTAMPDIFF(HOUR, COALESCE(ordered_at, created_at), NOW()) >= 1');
+            });
     }
 
     public function getBuktiPembayaranUrlAttribute(): ?string

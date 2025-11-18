@@ -12,6 +12,9 @@ const OrderSuccessPage = () => {
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [animateProgress, setAnimateProgress] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [isExpired, setIsExpired] = useState(false);
 
   const fetchOrder = async () => {
     if (!orderId || isNaN(orderId) || parseInt(orderId) <= 0) {
@@ -45,6 +48,79 @@ const OrderSuccessPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
+  useEffect(() => {
+    if (order && !loading) {
+      // Trigger animasi setelah order dimuat
+      setTimeout(() => setAnimateProgress(true), 100);
+    }
+  }, [order, loading]);
+
+  // Countdown timer untuk expired order
+  useEffect(() => {
+    if (!order || order.status !== 'belum_dibayar' || order.status === 'expired') {
+      return;
+    }
+
+    const orderDate = new Date(order.ordered_at || order.created_at);
+    const expiryDate = new Date(orderDate.getTime() + 60 * 60 * 1000); // 1 jam dari order date
+    const now = new Date();
+
+    if (now >= expiryDate) {
+      setIsExpired(true);
+      setTimeRemaining(null);
+        // Update status order menjadi expired
+        if (order.status === 'belum_dibayar') {
+          api.post(`/orders/${orderId}/expire`)
+            .then((response) => {
+              if (response.data?.data) {
+                setOrder(response.data.data);
+              }
+            })
+            .catch(() => {
+              // Jika endpoint error, update local state saja
+              setOrder({ ...order, status: 'expired' });
+            });
+        }
+        return;
+    }
+
+    const updateTimer = () => {
+      const now = new Date();
+      const diff = expiryDate - now;
+
+      if (diff <= 0) {
+        setIsExpired(true);
+        setTimeRemaining(null);
+        // Update status order menjadi expired
+        if (order.status === 'belum_dibayar') {
+          api.post(`/orders/${orderId}/expire`)
+            .then((response) => {
+              if (response.data?.data) {
+                setOrder(response.data.data);
+              }
+            })
+            .catch(() => {
+              // Jika endpoint error, update local state saja
+              setOrder({ ...order, status: 'expired' });
+            });
+        }
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeRemaining({ hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.status, order?.ordered_at, order?.created_at, orderId]);
+
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file) return;
@@ -64,6 +140,18 @@ const OrderSuccessPage = () => {
       setError(err.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const cancelOrder = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin membatalkan pesanan ini?')) return;
+    try {
+      await api.post(`/orders/${orderId}/cancel`);
+      setMessage('Pesanan berhasil dibatalkan.');
+      setError(null);
+      fetchOrder();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Gagal membatalkan pesanan');
     }
   };
 
@@ -91,6 +179,7 @@ const OrderSuccessPage = () => {
       selesai: 'Pesanan Selesai',
       dibatalkan: 'Dibatalkan',
       expired: 'Kedaluwarsa',
+      kadaluwarsa: 'Kedaluwarsa',
     };
     return statusMap[status] || status.replace('_', ' ');
   };
@@ -320,6 +409,75 @@ const OrderSuccessPage = () => {
             </div>
           </div>
 
+          {/* Countdown Timer - hanya tampil jika status belum_dibayar atau expired */}
+          {(order.status === 'belum_dibayar' || order.status === 'expired') && (
+            <div className={`mb-6 p-4 rounded-lg border-2 ${
+              isExpired || order.status === 'expired' || (timeRemaining && timeRemaining.hours === 0 && timeRemaining.minutes < 5)
+                ? 'bg-red-50 border-red-300'
+                : 'bg-yellow-50 border-yellow-300'
+            }`}>
+              <div className="flex items-center gap-3">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`h-6 w-6 ${isExpired || order.status === 'expired' ? 'text-red-600' : 'text-yellow-600'}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  {isExpired || order.status === 'expired' ? (
+                    <div>
+                      <p className="font-ui font-bold text-red-700 text-lg mb-1">
+                        ⚠️ Waktu Pembayaran Telah Habis
+                      </p>
+                      <p className="font-ui text-sm text-red-600">
+                        Pesanan Anda telah kadaluwarsa. Silakan buat pesanan baru.
+                      </p>
+                    </div>
+                  ) : timeRemaining ? (
+                    <div>
+                      <p className="font-ui font-semibold text-gray-900 mb-1">
+                        Waktu Tersisa untuk Pembayaran:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <span className="font-ui font-bold text-2xl" style={{ color: '#D2001A' }}>
+                            {String(timeRemaining.hours).padStart(2, '0')}
+                          </span>
+                          <span className="font-ui text-gray-600">:</span>
+                          <span className="font-ui font-bold text-2xl" style={{ color: '#D2001A' }}>
+                            {String(timeRemaining.minutes).padStart(2, '0')}
+                          </span>
+                          <span className="font-ui text-gray-600">:</span>
+                          <span className="font-ui font-bold text-2xl" style={{ color: '#D2001A' }}>
+                            {String(timeRemaining.seconds).padStart(2, '0')}
+                          </span>
+                        </div>
+                        <span className="font-ui text-sm text-gray-600">
+                          ({timeRemaining.hours} jam {timeRemaining.minutes} menit {timeRemaining.seconds} detik)
+                        </span>
+                      </div>
+                      {timeRemaining.hours === 0 && timeRemaining.minutes < 5 && (
+                        <p className="font-ui text-sm text-red-600 mt-2">
+                          ⚠️ Waktu pembayaran akan segera habis! Segera lakukan pembayaran.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="font-ui text-sm text-gray-600">Menghitung waktu tersisa...</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Progress Bar */}
           <div className="relative py-6 px-12">
             {/* Container untuk garis yang dibatasi */}
@@ -332,41 +490,51 @@ const OrderSuccessPage = () => {
                   right: '40px'
                 }}
               />
-              {/* Garis progress (merah) */}
+              {/* Garis progress (merah) dengan animasi */}
               <div
-                className="absolute top-10 h-1 bg-[#D2001A] transition-all duration-500"
+                className="absolute top-10 h-1 bg-[#D2001A] transition-all duration-1500 ease-out"
                 style={{ 
                   left: '40px',
-                  width: `calc(${completedWidthPercent}% - 80px)`
+                  width: animateProgress ? `calc(${completedWidthPercent}% - 80px)` : '0',
+                  transformOrigin: 'left center'
                 }}
               />
               {/* Titik status */}
               <div className="relative flex items-center justify-between">
-                {steps.map((step) => (
-                  <div key={step.id} className="flex flex-col items-center">
+                {steps.map((step, index) => (
+                  <div 
+                    key={step.id} 
+                    className="flex flex-col items-center"
+                    style={{
+                      animation: animateProgress ? `fadeInUp 0.6s ease-out ${index * 0.15}s both` : 'none'
+                    }}
+                  >
                     <div
-                      className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 border-4 shadow-md ${
+                      className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 border-4 shadow-md transition-all duration-500 ${
                         step.completed
-                          ? 'text-white border-[#D2001A]'
-                          : 'text-gray-400 border-gray-300 bg-white'
+                          ? 'text-white border-[#D2001A] scale-100'
+                          : 'text-gray-400 border-gray-300 bg-white scale-90'
                       }`}
                       style={
                         step.completed
-                          ? { backgroundColor: '#D2001A' }
+                          ? { 
+                              backgroundColor: '#D2001A',
+                              animation: 'pulse 2s ease-in-out infinite'
+                            }
                           : {}
                       }
                     >
                       {step.icon}
                     </div>
                     <p
-                      className={`font-ui font-semibold text-sm text-center mb-1 ${
+                      className={`font-ui font-semibold text-sm text-center mb-1 transition-colors duration-300 ${
                         step.completed ? 'text-gray-900' : 'text-gray-400'
                       }`}
                     >
                       {step.label}
                     </p>
                     {step.date && (
-                      <p className="font-ui text-xs text-gray-500 text-center">
+                      <p className="font-ui text-xs text-gray-500 text-center animate-fade-in">
                         {formatDate(step.date)}
                       </p>
                     )}
@@ -375,6 +543,44 @@ const OrderSuccessPage = () => {
               </div>
             </div>
           </div>
+          
+          {/* CSS Animations */}
+          <style>{`
+            @keyframes fadeInUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            
+            @keyframes pulse {
+              0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(210, 0, 26, 0.4);
+              }
+              50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 8px rgba(210, 0, 26, 0);
+              }
+            }
+            
+            .animate-fade-in {
+              animation: fadeIn 0.8s ease-out;
+            }
+            
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+          `}</style>
         </div>
 
         {/* Main Content - 2 Columns */}
@@ -528,6 +734,15 @@ const OrderSuccessPage = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4">
+          {['belum_dibayar', 'menunggu_konfirmasi', 'expired'].includes(order.status) && (
+            <button
+              onClick={cancelOrder}
+              className="px-6 py-3 border-2 rounded-lg font-ui font-semibold text-[16px] transition-colors hover:bg-red-50"
+              style={{ borderColor: '#DC2626', color: '#DC2626' }}
+            >
+              Batalkan Pesanan
+            </button>
+          )}
           {order.bukti_pembayaran_url && (
             <a
               href={order.bukti_pembayaran_url}

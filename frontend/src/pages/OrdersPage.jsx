@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
-import { useAuth } from '../context/AuthContext';
 import { SkeletonOrderCard } from '../components/Skeleton';
 import ProfileSidebar from '../components/ProfileSidebar';
 
 const OrdersPage = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -78,6 +75,18 @@ const OrdersPage = () => {
       fetchOrders();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Gagal mengkonfirmasi pesanan');
+    }
+  };
+
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm('Apakah Anda yakin ingin membatalkan pesanan ini?')) return;
+    try {
+      await api.post(`/orders/${orderId}/cancel`);
+      setSuccessMessage('Pesanan berhasil dibatalkan.');
+      setError(null);
+      fetchOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Gagal membatalkan pesanan');
     }
   };
 
@@ -224,6 +233,15 @@ const OrdersPage = () => {
                         >
                           Hubungi Admin
                         </button>
+                        {['belum_dibayar', 'menunggu_konfirmasi', 'expired'].includes(order.status) && (
+                          <button
+                            onClick={() => cancelOrder(order.id)}
+                            className="px-6 py-2 border-2 rounded-lg font-ui font-semibold text-[14px] transition-colors hover:bg-red-50"
+                            style={{ borderColor: '#DC2626', color: '#DC2626' }}
+                          >
+                            Batalkan Pesanan
+                          </button>
+                        )}
                         {order.status === 'dikirim' && (
                           <button
                             onClick={() => confirmDelivery(order.id)}

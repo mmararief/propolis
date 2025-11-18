@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{id}/upload-proof', [PaymentController::class, 'uploadProof']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::post('/orders/{id}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
+    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 });
 
 Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {

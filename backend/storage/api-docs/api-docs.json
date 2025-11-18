@@ -826,6 +826,130 @@
                 ]
             }
         },
+        "/orders/{id}/expire": {
+            "post": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Tandai pesanan sebagai expired",
+                "description": "Mengubah status pesanan menjadi 'expired' jika sudah lebih dari 1 jam dari waktu order dibuat. Hanya untuk pesanan dengan status 'belum_dibayar'.",
+                "operationId": "10eebb7472bc09adcf7fa60043bacc1c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID pesanan yang akan ditandai expired",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pesanan ditandai expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Data pesanan yang telah expired",
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pesanan telah ditandai sebagai kadaluwarsa."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Tidak berhak mengubah order ini"
+                    },
+                    "422": {
+                        "description": "Status order tidak valid atau waktu pembayaran belum habis"
+                    },
+                    "404": {
+                        "description": "Order tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/orders/{id}/cancel": {
+            "post": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Batalkan pesanan",
+                "description": "Membatalkan pesanan dengan status 'belum_dibayar', 'menunggu_konfirmasi', atau 'expired'. Otomatis melepas reservasi/allokasi batch dan mengembalikan stok.",
+                "operationId": "f01ac571088d34f82562b3d48911f6f4",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID pesanan yang akan dibatalkan",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pesanan berhasil dibatalkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Data pesanan yang telah dibatalkan",
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pesanan berhasil dibatalkan."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Tidak berhak mengubah order ini"
+                    },
+                    "422": {
+                        "description": "Status order tidak dapat dibatalkan atau ID pesanan tidak valid"
+                    },
+                    "404": {
+                        "description": "Order tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/orders/{id}/upload-proof": {
             "post": {
                 "tags": [
