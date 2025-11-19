@@ -4,7 +4,7 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getProductImageUrl } from '../utils/imageHelper';
-import { getProductPriceTiers, getUnitPriceForQuantity } from '../utils/pricing';
+import { getProductPriceTiersSync, getUnitPriceForQuantitySync } from '../utils/pricing';
 
 const originCityId = import.meta.env.VITE_ORIGIN_CITY_ID ?? 149;
 
@@ -155,14 +155,14 @@ const CheckoutPage = () => {
   const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
   const grandTotal = total + (form.ongkos_kirim || 0);
   const enrichedItems = items.map((item) => {
-    const tiers = getProductPriceTiers(item.product);
-    const { tier: activeTier, unitPrice } = getUnitPriceForQuantity(item.product, item.qty);
+    const tiers = getProductPriceTiersSync();
+    const { tier: activeTier, unitPrice } = getUnitPriceForQuantitySync(item.product, item.qty);
     const nextTier = tiers.find((tier) => tier.min_jumlah > item.qty);
     return {
       ...item,
       tiers,
       activeTier,
-      unitPrice: unitPrice || item.product.harga_ecer || 0,
+      unitPrice: unitPrice || item.product.harga_ecer || 250000,
       nextTier,
     };
   });

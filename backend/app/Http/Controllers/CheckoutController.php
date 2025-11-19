@@ -136,18 +136,20 @@ class CheckoutController extends Controller
 
         foreach ($items as $payload) {
             /** @var Product $product */
-            $product = Product::with('priceTiers')->findOrFail($payload['product_id']);
+            $product = Product::findOrFail($payload['product_id']);
             $qty = (int) $payload['jumlah'];
             $tier = null;
 
+            // If a specific tier ID is provided, check global tiers
             if (! empty($payload['harga_tingkat_id'])) {
-                $tier = PriceTier::where('product_id', $product->id)
+                $tier = PriceTier::global()
                     ->where('id', $payload['harga_tingkat_id'])
                     ->first();
             }
 
+            // If no tier found yet, find matching global tier based on quantity
             if (! $tier) {
-                $tier = $product->priceTiers()
+                $tier = PriceTier::global()
                     ->where('min_jumlah', '<=', $qty)
                     ->where(function ($query) use ($qty) {
                         $query->whereNull('max_jumlah')
@@ -157,7 +159,12 @@ class CheckoutController extends Controller
                     ->first();
             }
 
-            $hargaSatuan = $tier?->harga_total ?? $product->harga_ecer;
+            // harga_total adalah total harga untuk min_jumlah item, jadi hitung harga per item
+            if ($tier) {
+                $hargaSatuan = $tier->harga_total / $tier->min_jumlah;
+            } else {
+                $hargaSatuan = $product->harga_ecer;
+            }
             $total = $hargaSatuan * $qty;
 
             $result['items'][] = [

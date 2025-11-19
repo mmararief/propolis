@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../api/client';
 import { getProductImageUrl } from '../../utils/imageHelper';
@@ -27,22 +27,6 @@ const AdminProductFormPage = () => {
   const [error, setError] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [existingImage, setExistingImage] = useState(null);
-  const [priceTiers, setPriceTiers] = useState([]);
-  const [tierFetching, setTierFetching] = useState(false);
-  const [tierActionLoading, setTierActionLoading] = useState(false);
-  const [tierError, setTierError] = useState(null);
-  const tierInitialForm = useMemo(
-    () => ({
-      min_jumlah: '',
-      max_jumlah: '',
-      harga_total: '',
-      label: '',
-    }),
-    [],
-  );
-  const [tierForm, setTierForm] = useState(tierInitialForm);
-  const [editingTierId, setEditingTierId] = useState(null);
-  const [editTierValues, setEditTierValues] = useState(tierInitialForm);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -69,7 +53,6 @@ const AdminProductFormPage = () => {
         gambar_file: null,
       });
       setExistingImage(product.gambar ? getProductImageUrl(product.gambar) : null);
-      setPriceTiers(product.price_tiers ?? product.priceTiers ?? []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Gagal memuat produk');
     } finally {
@@ -77,32 +60,12 @@ const AdminProductFormPage = () => {
     }
   }, [id]);
 
-  const fetchPriceTiers = useCallback(async () => {
-    if (!isEdit) return;
-    setTierFetching(true);
-    setTierError(null);
-    try {
-      const { data } = await api.get(`/admin/products/${id}/price-tiers`);
-      setPriceTiers(data.data ?? data ?? []);
-    } catch (err) {
-      setTierError(err.response?.data?.message || err.message || 'Gagal memuat harga tingkat');
-    } finally {
-      setTierFetching(false);
-    }
-  }, [id, isEdit]);
-
   useEffect(() => {
     fetchCategories();
     if (isEdit) {
       fetchProduct();
     }
   }, [fetchCategories, fetchProduct, isEdit]);
-
-  useEffect(() => {
-    if (isEdit) {
-      fetchPriceTiers();
-    }
-  }, [fetchPriceTiers, isEdit]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -115,84 +78,6 @@ const AdminProductFormPage = () => {
         setImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const resetTierForms = () => {
-    setTierForm(tierInitialForm);
-    setEditingTierId(null);
-    setEditTierValues(tierInitialForm);
-  };
-
-  const handleAddTier = async (e) => {
-    e.preventDefault();
-    if (!isEdit) return;
-    setTierError(null);
-    setTierActionLoading(true);
-    try {
-      await api.post(`/admin/products/${id}/price-tiers`, {
-        min_jumlah: Number(tierForm.min_jumlah),
-        max_jumlah: tierForm.max_jumlah ? Number(tierForm.max_jumlah) : null,
-        harga_total: Number(tierForm.harga_total),
-        label: tierForm.label || null,
-      });
-      resetTierForms();
-      fetchPriceTiers();
-    } catch (err) {
-      setTierError(err.response?.data?.message || err.message || 'Gagal menambah harga tingkat');
-    } finally {
-      setTierActionLoading(false);
-    }
-  };
-
-  const startEditTier = (tier) => {
-    setEditingTierId(tier.id);
-    setEditTierValues({
-      min_jumlah: tier.min_jumlah?.toString() ?? '',
-      max_jumlah: tier.max_jumlah?.toString() ?? '',
-      harga_total: tier.harga_total?.toString() ?? '',
-      label: tier.label ?? '',
-    });
-  };
-
-  const cancelEditTier = () => {
-    setEditingTierId(null);
-    setEditTierValues(tierInitialForm);
-  };
-
-  const handleUpdateTier = async (tierId) => {
-    setTierError(null);
-    setTierActionLoading(true);
-    try {
-      await api.put(`/admin/products/${id}/price-tiers/${tierId}`, {
-        min_jumlah: Number(editTierValues.min_jumlah),
-        max_jumlah: editTierValues.max_jumlah ? Number(editTierValues.max_jumlah) : null,
-        harga_total: Number(editTierValues.harga_total),
-        label: editTierValues.label || null,
-      });
-      cancelEditTier();
-      fetchPriceTiers();
-    } catch (err) {
-      setTierError(err.response?.data?.message || err.message || 'Gagal memperbarui harga tingkat');
-    } finally {
-      setTierActionLoading(false);
-    }
-  };
-
-  const handleDeleteTier = async (tierId) => {
-    if (!window.confirm('Hapus harga tingkat ini?')) return;
-    setTierError(null);
-    setTierActionLoading(true);
-    try {
-      await api.delete(`/admin/products/${id}/price-tiers/${tierId}`);
-      if (editingTierId === tierId) {
-        cancelEditTier();
-      }
-      fetchPriceTiers();
-    } catch (err) {
-      setTierError(err.response?.data?.message || err.message || 'Gagal menghapus harga tingkat');
-    } finally {
-      setTierActionLoading(false);
     }
   };
 
@@ -444,199 +329,6 @@ const AdminProductFormPage = () => {
           )}
         </form>
       </div>
-
-      {isEdit && (
-        <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Harga Tingkat</h2>
-              <p className="text-sm text-slate-500">
-                Atur diskon berdasarkan jumlah pembelian. Harga ini akan dipakai otomatis saat checkout.
-              </p>
-            </div>
-            <button type="button" className="btn-outline text-sm" onClick={fetchPriceTiers} disabled={tierFetching}>
-              {tierFetching ? 'Memuat...' : 'Refresh'}
-            </button>
-          </div>
-
-          {tierError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{tierError}</div>
-          )}
-
-            <div className="overflow-x-auto">
-              {tierFetching ? (
-                <p className="text-sm text-slate-500">Memuat harga tingkat...</p>
-              ) : priceTiers.length === 0 ? (
-                <p className="text-sm text-slate-500">Belum ada harga tingkat untuk produk ini.</p>
-              ) : (
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-slate-500 border-b">
-                      <th className="py-2">Rentang Qty</th>
-                      <th className="py-2">Label</th>
-                      <th className="py-2">Harga Total</th>
-                      <th className="py-2 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {priceTiers.map((tier) => (
-                      <tr key={tier.id} className="border-b">
-                        <td className="py-3">
-                          {editingTierId === tier.id ? (
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                min="1"
-                                className="input-field w-24"
-                                value={editTierValues.min_jumlah}
-                                onChange={(e) => setEditTierValues({ ...editTierValues, min_jumlah: e.target.value })}
-                              />
-                              <span className="text-sm text-slate-500">sampai</span>
-                              <input
-                                type="number"
-                                min={editTierValues.min_jumlah || 1}
-                                className="input-field w-24"
-                                value={editTierValues.max_jumlah}
-                                onChange={(e) => setEditTierValues({ ...editTierValues, max_jumlah: e.target.value })}
-                              />
-                            </div>
-                          ) : (
-                            <span className="font-medium text-slate-900">
-                              {tier.min_jumlah}+{tier.max_jumlah ? ` - ${tier.max_jumlah}` : ''}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {editingTierId === tier.id ? (
-                            <input
-                              className="input-field w-full"
-                              value={editTierValues.label}
-                              onChange={(e) => setEditTierValues({ ...editTierValues, label: e.target.value })}
-                              placeholder="Label (opsional)"
-                            />
-                          ) : (
-                            <span className="text-slate-700">{tier.label || '-'}</span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {editingTierId === tier.id ? (
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field w-full"
-                              value={editTierValues.harga_total}
-                              onChange={(e) => setEditTierValues({ ...editTierValues, harga_total: e.target.value })}
-                            />
-                          ) : (
-                            <span className="font-semibold text-slate-900">
-                              Rp {Number(tier.harga_total).toLocaleString('id-ID')}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 text-right">
-                          {editingTierId === tier.id ? (
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                className="btn-primary px-3 py-1 text-xs"
-                                onClick={() => handleUpdateTier(tier.id)}
-                                disabled={tierActionLoading}
-                              >
-                                Simpan
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-outline px-3 py-1 text-xs"
-                                onClick={cancelEditTier}
-                                disabled={tierActionLoading}
-                              >
-                                Batal
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                className="btn-outline px-3 py-1 text-xs"
-                                onClick={() => startEditTier(tier)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-outline px-3 py-1 text-xs text-red-600 border-red-200 hover:text-red-700"
-                                onClick={() => handleDeleteTier(tier.id)}
-                                disabled={tierActionLoading}
-                              >
-                                Hapus
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-          <form className="border border-dashed border-slate-300 rounded-lg p-4 space-y-4" onSubmit={handleAddTier}>
-            <div className="grid md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Min Qty</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="input-field w-full"
-                  value={tierForm.min_jumlah}
-                  onChange={(e) => setTierForm({ ...tierForm, min_jumlah: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Max Qty</label>
-                <input
-                  type="number"
-                  min={tierForm.min_jumlah || 1}
-                  className="input-field w-full"
-                  value={tierForm.max_jumlah}
-                  onChange={(e) => setTierForm({ ...tierForm, max_jumlah: e.target.value })}
-                  placeholder="Opsional"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Harga Total (Rp)</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input-field w-full"
-                  value={tierForm.harga_total}
-                  onChange={(e) => setTierForm({ ...tierForm, harga_total: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Label</label>
-                <input
-                  className="input-field w-full"
-                  value={tierForm.label}
-                  onChange={(e) => setTierForm({ ...tierForm, label: e.target.value })}
-                  placeholder="Contoh: Reseller"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={tierActionLoading || !tierForm.min_jumlah || !tierForm.harga_total}
-              >
-                {tierActionLoading ? 'Menyimpan...' : 'Tambah Harga Tingkat'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 };

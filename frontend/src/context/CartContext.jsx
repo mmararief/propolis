@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';
-import { getUnitPriceForQuantity } from '../utils/pricing';
+import { getUnitPriceForQuantitySync, fetchGlobalPriceTiers } from '../utils/pricing';
 import api from '../api/client';
 import { useAuth } from './AuthContext';
 
@@ -8,6 +8,11 @@ const CartContext = createContext(null);
 export const CartProvider = ({ children }) => {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+
+  // Fetch global price tiers on mount
+  useEffect(() => {
+    fetchGlobalPriceTiers().catch(err => console.error("Failed to fetch price tiers:", err));
+  }, []);
 
   // Fetch cart from API when user logs in
   useEffect(() => {
@@ -107,8 +112,8 @@ export const CartProvider = ({ children }) => {
   const total = useMemo(
     () =>
       items.reduce((sum, item) => {
-        const { unitPrice } = getUnitPriceForQuantity(item.product, item.qty);
-        const price = unitPrice || item.product.harga_ecer || 0;
+        const { unitPrice } = getUnitPriceForQuantitySync(item.product, item.qty);
+        const price = unitPrice || item.product.harga_ecer || 250000;
         return sum + price * item.qty;
       }, 0),
     [items],

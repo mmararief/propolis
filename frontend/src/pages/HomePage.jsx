@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../api/client';
+// import api from '../api/client';
 // import { SkeletonProductCard } from '../components/Skeleton';
 // import { getProductImageUrl } from '../utils/imageHelper';
 import Hero from '../components/Hero';
@@ -33,25 +33,7 @@ import email1Icon from '../assets/images/email1.png';
 import clockIcon from '../assets/images/clock0.png';
 
 const HomePage = () => {
-  const [bestSellers, setBestSellers] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState(0); // FAQ pertama terbuka default
-
-  useEffect(() => {
-    const fetchBestSellers = async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get('/products?limit=4');
-        const products = data.data?.data ?? data.data ?? [];
-        setBestSellers(products.slice(0, 4));
-      } catch (err) {
-        console.error('Error fetching products:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBestSellers();
-  }, []);
 
   const faqs = [
     {
@@ -203,7 +185,7 @@ const HomePage = () => {
       </div>
 
       {/* ===== BEST SELLERS SECTION ===== */}
-      <ProdukTerlaris/>
+      <ProdukTerlaris />
       {/* ===== CARA PEMESANAN SECTION ===== */}
       <div className="relative w-full py-16" style={{ backgroundColor: '#f1f1f1' }}>
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-8 lg:px-16 xl:px-[150px]">
@@ -339,18 +321,16 @@ const HomePage = () => {
                   return (
                     <div
                       key={faq.id}
-                      className={`w-full rounded-[10px] px-5 py-4 flex flex-col cursor-pointer transition-all ${
-                        openFaqIndex === index
-                          ? 'min-h-[120px] bg-[#d9d9d9]'
-                          : 'h-[60px] border border-[#9b9b9b] bg-white hover:bg-slate-50'
-                      }`}
+                      className={`w-full rounded-[10px] px-5 py-4 flex flex-col cursor-pointer transition-all ${openFaqIndex === index
+                        ? 'min-h-[120px] bg-[#d9d9d9]'
+                        : 'h-[60px] border border-[#9b9b9b] bg-white hover:bg-slate-50'
+                        }`}
                       onClick={() => setOpenFaqIndex(openFaqIndex === index ? -1 : index)}
                     >
                       <div className="flex items-center justify-between h-full min-h-[20px]">
                         <p
-                          className={`font-ui font-bold text-[18px] flex-1 pr-4 ${
-                            openFaqIndex === index ? 'text-white' : 'text-black'
-                          }`}
+                          className={`font-ui font-bold text-[18px] flex-1 pr-4 ${openFaqIndex === index ? 'text-white' : 'text-black'
+                            }`}
                         >
                           {faq.question}
                         </p>
@@ -417,18 +397,16 @@ const HomePage = () => {
                   {faqs.map((faq, index) => (
                     <div
                       key={faq.id}
-                      className={`w-full rounded-[10px] px-5 py-4 flex flex-col cursor-pointer transition-all ${
-                        openFaqIndex === index
-                          ? 'min-h-[120px] bg-[#d9d9d9]'
-                          : 'h-[60px] border border-[#9b9b9b] bg-white hover:bg-slate-50'
-                      }`}
+                      className={`w-full rounded-[10px] px-5 py-4 flex flex-col cursor-pointer transition-all ${openFaqIndex === index
+                        ? 'min-h-[120px] bg-[#d9d9d9]'
+                        : 'h-[60px] border border-[#9b9b9b] bg-white hover:bg-slate-50'
+                        }`}
                       onClick={() => setOpenFaqIndex(openFaqIndex === index ? -1 : index)}
                     >
                       <div className="flex items-center justify-between h-full min-h-[20px]">
                         <p
-                          className={`font-ui font-bold text-base sm:text-lg flex-1 pr-4 ${
-                            openFaqIndex === index ? 'text-white' : 'text-black'
-                          }`}
+                          className={`font-ui font-bold text-base sm:text-lg flex-1 pr-4 ${openFaqIndex === index ? 'text-white' : 'text-black'
+                            }`}
                         >
                           {faq.question}
                         </p>
@@ -469,9 +447,9 @@ const HomePage = () => {
               className="w-full h-[200px] sm:h-[300px] lg:h-[390px] object-cover"
             />
             <div className="flex-1">
-              <h2 
+              <h2
                 className="text-2xl sm:text-3xl lg:text-[48px] font-ui font-bold mb-4"
-                style={{ 
+                style={{
                   color: '#D2001A',
                   WebkitTextStroke: '1px #fff',
                   textStroke: '1px #fff'
@@ -607,8 +585,8 @@ const HomePage = () => {
           </p>
         </div>
       </div>
-  </div>
-);
+    </div>
+  );
 };
 
 export default HomePage;

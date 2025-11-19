@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Category;
-use App\Models\PriceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Annotations as OA;
@@ -48,7 +47,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with(['category', 'priceTiers' => fn($q) => $q->orderBy('min_jumlah')])
+            ->with(['category'])
             ->withSum('batches as total_qty_remaining', 'qty_remaining')
             ->withSum('batches as total_reserved_qty', 'reserved_qty');
 
@@ -60,7 +59,7 @@ class ProductController extends Controller
             $products->where('kategori_id', $request->integer('kategori_id'));
         }
 
-        $perPage = $request->integer('per_page', 15);
+        $perPage = $request->integer('per_page', $request->integer('limit', 15));
 
         return $this->success($products->paginate($perPage));
     }
@@ -104,7 +103,6 @@ class ProductController extends Controller
                     'purchase_price',
                 ]);
             },
-            'priceTiers' => fn($q) => $q->orderBy('min_jumlah'),
         ])->findOrFail($id);
 
         return $this->success($product);
@@ -229,82 +227,6 @@ class ProductController extends Controller
         $product->fill($data)->save();
 
         return $this->success($product->fresh(), 'Produk berhasil diperbarui');
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/products/{productId}/price-tiers",
-     *     tags={"Products"},
-     *     summary="Tambahkan harga tingkat",
-     *     security={{"sanctum": {}}},
-     *     @OA\Parameter(name="productId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"min_jumlah","harga_total"},
-     *             @OA\Property(property="min_jumlah", type="integer"),
-     *             @OA\Property(property="max_jumlah", type="integer", nullable=true),
-     *             @OA\Property(property="harga_total", type="number", format="float"),
-     *             @OA\Property(property="label", type="string", nullable=true)
-     *         )
-     *     ),
-     *     @OA\Response(response=201, description="Harga tingkat ditambahkan")
-     * )
-     */
-    public function addPriceTier(Request $request, int $productId)
-    {
-        $this->authorize('admin');
-
-        $product = Product::findOrFail($productId);
-
-        $data = $request->validate([
-            'min_jumlah' => ['required', 'integer', 'min:1'],
-            'max_jumlah' => ['nullable', 'integer', 'gte:min_jumlah'],
-            'harga_total' => ['required', 'numeric', 'min:0'],
-            'label' => ['nullable', 'string', 'max:50'],
-        ]);
-
-        $tier = $product->priceTiers()->create($data);
-
-        return $this->success($tier, 'Harga tingkat berhasil ditambahkan', 201);
-    }
-
-    public function priceTiers(int $productId)
-    {
-        $this->authorize('admin');
-
-        $product = Product::with('priceTiers')->findOrFail($productId);
-
-        return $this->success($product->priceTiers);
-    }
-
-    public function updatePriceTier(Request $request, int $productId, int $tierId)
-    {
-        $this->authorize('admin');
-
-        /** @var PriceTier $tier */
-        $tier = PriceTier::where('product_id', $productId)->findOrFail($tierId);
-
-        $data = $request->validate([
-            'min_jumlah' => ['required', 'integer', 'min:1'],
-            'max_jumlah' => ['nullable', 'integer', 'gte:min_jumlah'],
-            'harga_total' => ['required', 'numeric', 'min:0'],
-            'label' => ['nullable', 'string', 'max:50'],
-        ]);
-
-        $tier->update($data);
-
-        return $this->success($tier->fresh(), 'Harga tingkat berhasil diperbarui');
-    }
-
-    public function deletePriceTier(int $productId, int $tierId)
-    {
-        $this->authorize('admin');
-
-        $tier = PriceTier::where('product_id', $productId)->findOrFail($tierId);
-        $tier->delete();
-
-        return $this->success(null, 'Harga tingkat berhasil dihapus');
     }
 
     /**

@@ -32,11 +32,11 @@ class DatabaseSeeder extends Seeder
             ->map(fn($name) => Category::firstOrCreate(['nama_kategori' => $name]));
 
         $products = collect([
-            ['sku' => 'PRP-001', 'nama' => 'Propolis 10ml', 'harga' => 75000],
-            ['sku' => 'PRP-002', 'nama' => 'Propolis 20ml', 'harga' => 135000],
-            ['sku' => 'PRP-003', 'nama' => 'Face Serum', 'harga' => 99000],
-            ['sku' => 'PRP-004', 'nama' => 'Bundling Hemat', 'harga' => 210000],
-            ['sku' => 'PRP-005', 'nama' => 'Honey Boost', 'harga' => 68000],
+            ['sku' => 'PRP-001', 'nama' => 'Propolis 10ml'],
+            ['sku' => 'PRP-002', 'nama' => 'Propolis 20ml'],
+            ['sku' => 'PRP-003', 'nama' => 'Face Serum'],
+            ['sku' => 'PRP-004', 'nama' => 'Bundling Hemat'],
+            ['sku' => 'PRP-005', 'nama' => 'Honey Boost'],
         ])->map(function ($item, $index) use ($categories) {
             return Product::updateOrCreate(
                 ['sku' => $item['sku']],
@@ -44,24 +44,35 @@ class DatabaseSeeder extends Seeder
                     'kategori_id' => $categories[$index % $categories->count()]->id,
                     'nama_produk' => $item['nama'],
                     'deskripsi' => 'Produk sampel untuk pengujian backend.',
-                    'harga_ecer' => $item['harga'],
+                    'harga_ecer' => 250000,
                     'stok' => 0,
                     'status' => 'aktif',
                 ]
             );
         });
 
+        // Create global price tiers (berlaku untuk semua produk)
+        PriceTier::updateOrCreate(
+            ['product_id' => null, 'min_jumlah' => 1],
+            ['max_jumlah' => 2, 'harga_total' => 250000, 'label' => 'Konsumen']
+        );
+
+        PriceTier::updateOrCreate(
+            ['product_id' => null, 'min_jumlah' => 3],
+            ['max_jumlah' => 4, 'harga_total' => 650000, 'label' => 'Reseller']
+        );
+
+        PriceTier::updateOrCreate(
+            ['product_id' => null, 'min_jumlah' => 5],
+            ['max_jumlah' => 9, 'harga_total' => 990000, 'label' => 'Agen']
+        );
+
+        PriceTier::updateOrCreate(
+            ['product_id' => null, 'min_jumlah' => 10],
+            ['max_jumlah' => null, 'harga_total' => 1800000, 'label' => 'Agen Plus']
+        );
+
         foreach ($products as $product) {
-            PriceTier::updateOrCreate(
-                ['product_id' => $product->id, 'min_jumlah' => 5],
-                ['max_jumlah' => 9, 'harga_total' => $product->harga_ecer * 0.95, 'label' => 'Reseller Lite']
-            );
-
-            PriceTier::updateOrCreate(
-                ['product_id' => $product->id, 'min_jumlah' => 10],
-                ['max_jumlah' => null, 'harga_total' => $product->harga_ecer * 0.9, 'label' => 'Reseller Pro']
-            );
-
             $batch = ProductBatch::create([
                 'product_id' => $product->id,
                 'batch_number' => 'BATCH-' . $product->id . '-' . now()->format('Ym'),

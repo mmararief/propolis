@@ -5,13 +5,14 @@ import { useCart } from '../context/CartContext';
 import cartIcon from '../assets/images/shopping-cart0.png';
 import { SkeletonText, SkeletonButton, SkeletonProductCard } from '../components/Skeleton';
 import { getProductImageUrl } from '../utils/imageHelper';
-import { getProductPriceTiers } from '../utils/pricing';
+import { getProductPriceTiers, fetchGlobalPriceTiers } from '../utils/pricing';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [priceTiers, setPriceTiers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { addItem } = useCart();
@@ -22,8 +23,12 @@ const ProductDetailPage = () => {
     const fetchDetail = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/products/${id}`);
-        setProduct(data.data);
+        const [productResponse, tiers] = await Promise.all([
+          api.get(`/products/${id}`),
+          fetchGlobalPriceTiers()
+        ]);
+        setProduct(productResponse.data.data);
+        setPriceTiers(tiers || []);
         
         // Fetch related products
         try {
@@ -143,8 +148,6 @@ const ProductDetailPage = () => {
 
   if (!product) return null;
 
-  const priceTiers = getProductPriceTiers(product);
-
   const available = product.batches?.reduce((sum, batch) => sum + (batch.qty_remaining || 0), 0) || 0;
   const price = selectedVariant === 'dus' ? (product.harga_grosir || product.harga_ecer) : product.harga_ecer;
 
@@ -223,8 +226,9 @@ const ProductDetailPage = () => {
                 <div className="space-y-2">
                   {priceTiers.map((tier) => {
                     const label = tier.label || `≥ ${tier.min_jumlah}${tier.max_jumlah ? ` - ${tier.max_jumlah}` : ''} pcs`;
-                    const perUnit = tier.harga_total ?? product.harga_ecer;
-                    const sampleTotal = perUnit * (tier.min_jumlah || 1);
+                    // harga_total adalah total untuk min_jumlah item, jadi harga per item = harga_total / min_jumlah
+                    const perUnit = tier.harga_total && tier.min_jumlah ? tier.harga_total / tier.min_jumlah : product.harga_ecer;
+                    const sampleTotal = tier.harga_total || (perUnit * (tier.min_jumlah || 1));
                     return (
                       <div
                         key={tier.id}
@@ -241,7 +245,7 @@ const ProductDetailPage = () => {
                             Rp {Number(perUnit).toLocaleString('id-ID')} / pcs
                           </p>
                           <p className="text-xs text-slate-500">
-                            Contoh total {tier.min_jumlah} pcs: Rp {Number(sampleTotal).toLocaleString('id-ID')}
+                            Total untuk {tier.min_jumlah} pcs: Rp {Number(sampleTotal).toLocaleString('id-ID')}
                           </p>
                         </div>
                       </div>

@@ -99,7 +99,12 @@
             <tr>
                 <td><span class="badge get">GET</span></td>
                 <td><code>/api/products/{id}</code></td>
-                <td>Detail produk, batch, harga tingkat.</td>
+                <td>Detail produk, batch.</td>
+            </tr>
+            <tr>
+                <td><span class="badge get">GET</span></td>
+                <td><code>/api/price-tiers</code></td>
+                <td>Daftar harga tingkat global (berlaku untuk semua produk).</td>
             </tr>
             <tr>
                 <td><span class="badge get">GET</span></td>
@@ -193,9 +198,24 @@
                 <td>Lihat daftar batch produk.</td>
             </tr>
             <tr>
+                <td><span class="badge get">GET</span></td>
+                <td><code>/api/admin/price-tiers</code></td>
+                <td>Daftar harga tingkat global (untuk admin).</td>
+            </tr>
+            <tr>
                 <td><span class="badge post">POST</span></td>
-                <td><code>/api/products/{id}/price-tiers</code></td>
-                <td>Kelola harga tingkat.</td>
+                <td><code>/api/admin/price-tiers</code></td>
+                <td>Tambah harga tingkat global baru.</td>
+            </tr>
+            <tr>
+                <td><span class="badge put">PUT</span></td>
+                <td><code>/api/admin/price-tiers/{id}</code></td>
+                <td>Perbarui harga tingkat global.</td>
+            </tr>
+            <tr>
+                <td><span class="badge delete">DELETE</span></td>
+                <td><code>/api/admin/price-tiers/{id}</code></td>
+                <td>Hapus harga tingkat global.</td>
             </tr>
             <tr>
                 <td><span class="badge get">GET</span></td>

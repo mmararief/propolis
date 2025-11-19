@@ -17,6 +17,9 @@ Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories', [ProductController::class, 'categories']);
 
+// Public access to global price tiers
+Route::get('/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'index']);
+
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -52,18 +55,6 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::post('/products/{productId}/batches', [BatchController::class, 'store']);
     Route::get('/products/{productId}/batches', [BatchController::class, 'index']);
     Route::put('/products/{productId}/batches/{id}', [BatchController::class, 'update']);
-    Route::post('/products/{productId}/price-tiers', [ProductController::class, 'addPriceTier']);
-    Route::get('/products/{productId}/price-tiers', [ProductController::class, 'priceTiers']);
-    Route::put('/products/{productId}/price-tiers/{tierId}', [ProductController::class, 'updatePriceTier']);
-    Route::delete('/products/{productId}/price-tiers/{tierId}', [ProductController::class, 'deletePriceTier']);
-
-    // Admin-prefixed aliases for convenience
-    Route::prefix('admin')->group(function () {
-        Route::get('/products/{productId}/price-tiers', [ProductController::class, 'priceTiers']);
-        Route::post('/products/{productId}/price-tiers', [ProductController::class, 'addPriceTier']);
-        Route::put('/products/{productId}/price-tiers/{tierId}', [ProductController::class, 'updatePriceTier']);
-        Route::delete('/products/{productId}/price-tiers/{tierId}', [ProductController::class, 'deletePriceTier']);
-    });
 
     Route::get('/admin/categories', [CategoryController::class, 'index']);
     Route::post('/admin/categories', [CategoryController::class, 'store']);
@@ -77,6 +68,12 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::post('/admin/orders/{id}/ship', [AdminOrderController::class, 'ship']);
     Route::post('/admin/orders/{id}/mark-delivered', [AdminOrderController::class, 'markDelivered']);
     Route::post('/admin/run-reservation-release', [AdminOrderController::class, 'runReservationRelease']);
+
+    // Global Price Tiers Management
+    Route::get('/admin/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'index']);
+    Route::post('/admin/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'store']);
+    Route::put('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'update']);
+    Route::delete('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'destroy']);
 
     Route::get('/reports/batch-stock', [ReportController::class, 'batchStock']);
     Route::get('/reports/batch-sales', [ReportController::class, 'batchSales']);

@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { getProductImageUrl } from '../utils/imageHelper';
-import { getProductPriceTiers, getUnitPriceForQuantity } from '../utils/pricing';
+import { getProductPriceTiersSync, getUnitPriceForQuantitySync } from '../utils/pricing';
 
 const CartPage = () => {
   const { items, updateQty, clearCart, total } = useCart();
@@ -90,10 +90,10 @@ const CartPage = () => {
 
                 {/* Cart Items */}
                 {items.map((item) => {
-                  const tiers = getProductPriceTiers(item.product);
-                  const { tier: activeTier, unitPrice } = getUnitPriceForQuantity(item.product, item.qty);
+                  const tiers = getProductPriceTiersSync();
+                  const { tier: activeTier, unitPrice } = getUnitPriceForQuantitySync(item.product, item.qty);
                   const nextTier = tiers.find((tier) => tier.min_jumlah > item.qty);
-                  const activePrice = unitPrice || item.product.harga_ecer || 0;
+                  const activePrice = unitPrice || item.product.harga_ecer || 250000;
                   return (
                   <div
                     key={item.product.id}
@@ -142,7 +142,7 @@ const CartPage = () => {
                                 <p>
                                   Tambah {nextTier.min_jumlah - item.qty} pcs lagi untuk harga{' '}
                                   {nextTier.label || `≥ ${nextTier.min_jumlah} pcs`} (Rp{' '}
-                                  {Number(nextTier.harga_total ?? activePrice).toLocaleString('id-ID')} / pcs)
+                                  {Number((nextTier.harga_total && nextTier.min_jumlah ? nextTier.harga_total / nextTier.min_jumlah : activePrice)).toLocaleString('id-ID')} / pcs)
                                 </p>
                               )}
                             </div>

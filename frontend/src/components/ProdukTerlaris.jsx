@@ -1,75 +1,114 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import rect27 from '../assets/images/rectangle-270.png'
-import rect18 from '../assets/images/rectangle-180.png'
-import rect19 from '../assets/images/rectangle-190.png'
-import rect17 from '../assets/images/rectangle-170.png'
+import api from '../api/client'
+import { GoArrowRight } from "react-icons/go";
 import arrowIcon from '../assets/images/arrow-10.svg'
 
 const ProdukTerlaris = () => {
-  const products = [
-    { id: 1, image: rect27, name: 'British Propolis (D...)', price: 'Rp 250.000' },
-    { id: 2, image: rect18, name: 'Steffi Pro', price: 'Rp 250.000' },
-    { id: 3, image: rect19, name: 'British Propolis Gr...', price: 'Rp 250.000' },
-    { id: 4, image: rect17, name: 'Belgie Face Serum', price: 'Rp 250.000' },
-  ]
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const { data } = await api.get('/products?limit=4')
+        // Handle different response structures just in case
+        const productList = data.data?.data ?? data.data ?? []
+        setProducts(productList.slice(0, 4))
+      } catch (error) {
+        console.error('Error fetching best sellers:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [])
+
+  // Helper to format price
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(price)
+  }
 
   return (
-    <section className="relative w-full h-[659px] bg-[#f1f1f1]">
-      <div className="relative w-full h-full max-w-[1920px] mx-auto">
-        {/* Header */}
-        <h2 className="absolute left-[150px] top-[70px] text-brand-red font-poppins font-bold text-[48px] uppercase">
-          produk terlaris
-        </h2>
-        <p className="absolute left-[150px] top-[130px] text-black font-poppins font-light text-[22px]">
-          Temukan produk-produk unggulan yang paling dipercaya pelanggan kami.
-        </p>
-        <div className="absolute left-[1550px] top-[63px] w-[220px] h-[74px] rounded-[50px] bg-brand-red z-10">
-          <Link
-            to="/produk"
-            className="absolute left-[20px] top-[15px] w-[149px] h-[44px] flex items-center justify-center text-white font-poppins font-bold text-[20px] hover:opacity-90 transition-opacity"
-          >
-            Lihat Semua
-          </Link>
+    <section className="relative w-full py-16 bg-[#f1f1f1]">
+      <div className="container mx-auto px-4 sm:px-8 lg:px-16 max-w-screen-2xl">
+
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row items-end justify-between mb-12 gap-4">
+          <div className="max-w-2xl">
+            <h2 className="text-[#D2001A] font-poppins font-bold text-3xl sm:text-4xl lg:text-[48px] uppercase mb-2">
+              PRODUK TERLARIS
+            </h2>
+            <p className="text-black font-poppins font-light text-lg sm:text-[18px]">
+              Temukan produk-produk unggulan yang paling dipercaya pelanggan kami.
+            </p>
+          </div>
+
+          {/* Desktop "Lihat Semua" Button */}
+          <div className="hidden lg:block mb-2">
+            <Link
+              to="/products"
+              className="flex items-center justify-center w-fit h-[40px] px-6 bg-[#D2001A] rounded-[50px] text-white font-poppins font-bold text-[14px] hover:opacity-90 transition-opacity gap-2 shadow-md"
+            >
+              Lihat Semua
+              <GoArrowRight className="w-8 h-8" />
+            </Link>
+          </div>
         </div>
-        <img src={arrowIcon} alt="" className="absolute left-[1718.84px] top-[37px] w-[28.65px] z-20" />
 
         {/* Products Grid */}
-        {products.map((product, index) => {
-          const positions = [
-            { left: '150px', imgLeft: '160px', titleTop: '330px', priceTop: '360px' },
-            { left: '580px', imgLeft: '590px', titleTop: '330px', priceTop: '360px' },
-            { left: '1020px', imgLeft: '1030px', titleTop: '330px', priceTop: '360px' },
-            { left: '1450px', imgLeft: '1460px', titleTop: '330px', priceTop: '360px' },
-          ]
-          const pos = positions[index]
-          return (
-            <div
-              key={product.id}
-              className="absolute w-[320px] h-[400px] bg-white border border-[#d9d9d9]"
-              style={{ left: pos.left, top: '190px' }}
-            >
-              <img
-                src={product.image}
-                alt={product.name}
-                className="absolute w-[300px] h-[310px] object-cover"
-                style={{ left: '10px', top: '10px' }}
-              />
-              <h3
-                className="absolute text-black font-poppins font-medium text-[18px] flex items-center"
-                style={{ left: '10px', top: pos.titleTop, width: '180px' }}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {loading ? (
+            // Loading Skeletons
+            [...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg h-[400px] animate-pulse"></div>
+            ))
+          ) : products.length > 0 ? (
+            products.map((product) => (
+              <div
+                key={product.id}
+                className="bg-white border border-[#d9d9d9] rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full"
               >
-                {product.name}
-              </h3>
-              <p
-                className="absolute text-brand-red font-poppins font-bold text-[24px] flex items-center"
-                style={{ left: '10px', top: pos.priceTop, width: '180px' }}
-              >
-                {product.price}
-              </p>
+                <div className="relative pt-[100%] w-full bg-gray-50">
+                  <img
+                    src={product.gambar || 'https://placehold.co/300x300?text=No+Image'}
+                    alt={product.nama_produk}
+                    className="absolute top-0 left-0 w-full h-full object-cover p-4"
+                  />
+                </div>
+                <div className="p-4 flex flex-col flex-grow">
+                  <h3 className="text-black font-poppins font-medium text-[18px] mb-2 line-clamp-2 flex-grow">
+                    {product.nama_produk}
+                  </h3>
+                  <p className="text-brand-red font-poppins font-bold text-[24px]">
+                    {formatPrice(product.harga_ecer)}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-10 text-gray-500">
+              Belum ada produk terlaris saat ini.
             </div>
-          )
-        })}
+          )}
+        </div>
+
+        {/* Mobile "Lihat Semua" Button */}
+        <div className="mt-8 lg:hidden flex justify-center">
+          <Link
+            to="/products"
+            className="flex items-center justify-center w-fit h-[44px] px-6 bg-[#D2001A] rounded-[50px] text-white font-poppins font-bold text-[16px] hover:opacity-90 transition-opacity gap-2"
+          >
+            Lihat Semua
+            <img src={arrowIcon} alt="" className="w-5 h-5" />
+          </Link>
+        </div>
+
       </div>
     </section>
   )

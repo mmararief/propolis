@@ -36,9 +36,23 @@ class Product extends Model
         return $this->hasMany(ProductBatch::class);
     }
 
+    /**
+     * Get product-specific price tiers (deprecated - now using global price tiers)
+     * This method is kept for backward compatibility but will return empty for products without specific tiers.
+     * Use PriceTier::global() or Product::getAllPriceTiers() instead.
+     */
     public function priceTiers()
     {
         return $this->hasMany(PriceTier::class);
+    }
+
+    /**
+     * Get all applicable price tiers for this product (global tiers only)
+     * All products now use the same global price tiers.
+     */
+    public function getAllPriceTiers()
+    {
+        return PriceTier::global()->orderBy('min_jumlah')->get();
     }
 
     public function scopeActive($query)

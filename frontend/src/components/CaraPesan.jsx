@@ -41,57 +41,42 @@ const CaraPesan = () => {
   ]
 
   return (
-    <section className="relative w-full h-[580px] bg-[#f1f1f1]">
-      <div className="relative w-full h-full max-w-[1920px] mx-auto">
-        <h2 className="absolute left-1/2 -translate-x-1/2 top-[70px] text-brand-red font-poppins font-bold text-[40px] text-center">
+    <section className="relative w-full py-16 bg-[#f1f1f1]">
+      <div className="container mx-auto px-4 sm:px-8 lg:px-16 max-w-screen-2xl">
+        <h2 className="text-[#D2001A] font-poppins font-bold text-3xl sm:text-4xl lg:text-[40px] text-center mb-16">
           Bagaimana Cara Pemesanan?
         </h2>
 
         {/* Steps */}
-        <div className="absolute top-[170px] w-full">
-          {steps.map((step, index) => {
-            const positions = [
-              { imgLeft: '190px', titleLeft: '150px', descLeft: '150px' },
-              { imgLeft: '537px', titleLeft: '497px', descLeft: '497px' },
-              { imgLeft: '900px', titleLeft: '845px', descLeft: '860px' },
-              { imgLeft: '1262px', titleLeft: '1222px', descLeft: '1222px' },
-              { imgLeft: '1610px', titleLeft: '1570px', descLeft: '1570px' },
-            ]
-            const pos = positions[index]
-            return (
-              <React.Fragment key={step.id}>
-                <img
-                  src={step.image}
-                  alt={step.title}
-                  className="absolute w-[120px] h-[120px] object-cover"
-                  style={{ left: pos.imgLeft, top: '0px' }}
-                />
-                <h3
-                  className="absolute text-black font-poppins font-semibold text-[20px] text-center flex items-center justify-center"
-                  style={{ left: pos.titleLeft, top: '130px', width: '230px', height: '30px' }}
-                >
-                  {step.title}
-                </h3>
-                <p
-                  className="absolute text-black font-poppins font-normal text-[15px] text-center flex items-center justify-center"
-                  style={{ left: pos.descLeft, top: '160px', width: '200px', height: step.id === 2 || step.id === 3 ? '70px' : '50px' }}
-                >
-                  {step.description}
-                </p>
-              </React.Fragment>
-            )
-          })}
+        <div className="flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-4 mb-16">
+          {steps.map((step) => (
+            <div key={step.id} className="flex flex-col items-center text-center flex-1 min-w-[200px]">
+              <img
+                src={step.image}
+                alt={step.title}
+                className="w-[120px] h-[120px] object-cover mb-6"
+              />
+              <h3 className="text-black font-poppins font-semibold text-[20px] mb-2 min-h-[60px] flex items-center justify-center">
+                {step.title}
+              </h3>
+              <p className="text-black font-poppins font-normal text-[15px] px-2">
+                {step.description}
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* CTA Button */}
-        <Link
-          to="/produk"
-          className="absolute left-1/2 -translate-x-1/2 top-[450px] w-[240px] h-[60px] rounded-[50px] bg-gradient-to-r from-brand-red via-[#b40016] to-[#950012] flex items-center justify-center hover:opacity-90 transition-opacity"
-        >
-          <span className="text-white font-poppins font-bold text-[22px]">
-            Pesan Sekarang
-          </span>
-        </Link>
+        <div className="flex justify-center">
+          <Link
+            to="/produk"
+            className="w-[240px] h-[60px] rounded-[50px] bg-gradient-to-r from-[#D2001A] via-[#b40016] to-[#950012] flex items-center justify-center hover:opacity-90 transition-opacity shadow-lg"
+          >
+            <span className="text-white font-poppins font-bold text-[22px]">
+              Pesan Sekarang
+            </span>
+          </Link>
+        </div>
       </div>
     </section>
   )

@@ -10,6 +10,7 @@ const AdminSidebar = () => {
     { path: '/admin', label: 'Dashboard', icon: '⚡' },
     { path: '/admin/categories', label: 'Kelola Kategori', icon: '📁' },
     { path: '/admin/products', label: 'Kelola Produk', icon: '🏷️' },
+    { path: '/admin/price-tiers', label: 'Kelola Harga Tingkat', icon: '💰' },
     { path: '/admin/orders', label: 'Kelola Pesanan', icon: '🛒' },
     { path: '/admin/users', label: 'Kelola Akun Users', icon: '👥' },
     { path: '/admin/reports', label: 'Laporan', icon: '📄' },

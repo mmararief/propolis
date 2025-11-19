@@ -11,7 +11,7 @@ class CartController extends Controller
 {
     public function index()
     {
-        $cartItems = CartItem::with(['product.priceTiers', 'priceTier'])
+        $cartItems = CartItem::with(['product', 'priceTier'])
             ->where('user_id', Auth::id())
             ->get();
 
@@ -45,7 +45,7 @@ class CartController extends Controller
             ]);
         }
 
-        return response()->json($cartItem->load(['product.priceTiers', 'priceTier']));
+        return response()->json($cartItem->load(['product', 'priceTier']));
     }
 
     public function update(Request $request, $id)
@@ -61,7 +61,7 @@ class CartController extends Controller
         $cartItem->jumlah = $request->qty;
         $cartItem->save();
 
-        return response()->json($cartItem->load(['product.priceTiers', 'priceTier']));
+        return response()->json($cartItem->load(['product', 'priceTier']));
     }
 
     public function destroy($id)
