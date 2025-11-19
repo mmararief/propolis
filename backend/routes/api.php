@@ -36,6 +36,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::post('/orders/{id}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+
+    // Cart Routes
+    Route::get('/cart', [\App\Http\Controllers\CartController::class, 'index']);
+    Route::post('/cart', [\App\Http\Controllers\CartController::class, 'store']);
+    Route::put('/cart/{id}', [\App\Http\Controllers\CartController::class, 'update']);
+    Route::delete('/cart/{id}', [\App\Http\Controllers\CartController::class, 'destroy']);
+    Route::delete('/cart', [\App\Http\Controllers\CartController::class, 'clear']);
 });
 
 Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {

@@ -27,8 +27,11 @@ import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminOrderManualPage from './pages/admin/AdminOrderManualPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
 
+import ScrollToTop from './components/ScrollToTop';
+
 const App = () => (
   <BrowserRouter>
+    <ScrollToTop />
     <Routes>
       {/* Public Routes with Navbar */}
       <Route
