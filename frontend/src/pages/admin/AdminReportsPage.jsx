@@ -9,7 +9,7 @@ const KPI_CARDS = [
 ];
 
 const TABS = [
-  { id: 'stock', label: 'Stok Batch' },
+  { id: 'stock', label: 'Stok Produk' },
   { id: 'products', label: 'Penjualan Produk' },
   { id: 'channels', label: 'Performa Channel' },
 ];
@@ -130,23 +130,15 @@ const AdminReportsPage = () => {
   }, [productSearch]);
 
   const groupedStock = useMemo(() => {
-    const groups = {};
-    stock.forEach((row) => {
-      const key = row.product_id || row.nama_produk || row.batch_number;
-      if (!groups[key]) {
-        groups[key] = {
-          productName: row.nama_produk,
-          sku: row.sku,
-          totalQty: 0,
-          totalReserved: 0,
-          batches: [],
-        };
-      }
-      groups[key].totalQty += row.qty_remaining ?? 0;
-      groups[key].totalReserved += row.reserved_qty ?? 0;
-      groups[key].batches.push(row);
-    });
-    return Object.values(groups).sort((a, b) => b.totalQty - a.totalQty);
+    return stock
+      .map((row) => ({
+        productName: row.nama_produk,
+        sku: row.sku,
+        ready: row.qty_remaining ?? row.stok_available ?? 0,
+        reserved: row.reserved_qty ?? row.stok_reserved ?? 0,
+        total: row.qty_initial ?? row.stok ?? (row.qty_remaining ?? 0),
+      }))
+      .sort((a, b) => (b.ready ?? 0) - (a.ready ?? 0));
   }, [stock]);
 
   const renderTrend = () => {
@@ -341,21 +333,20 @@ const AdminReportsPage = () => {
         <div className="card space-y-3">
           <div className="flex items-center justify-between">
             <p className="font-semibold text-slate-900">Stok Kritis</p>
-            <span className="text-xs text-slate-500">Batch prioritas</span>
+            <span className="text-xs text-slate-500">Produk prioritas</span>
           </div>
           {lowStocks.length === 0 ? (
-            <p className="text-sm text-slate-500">Belum ada batch dengan stok kritis.</p>
+            <p className="text-sm text-slate-500">Belum ada produk dengan stok kritis.</p>
           ) : (
             <div className="space-y-3">
-              {lowStocks.map((batch) => (
-                <div key={`${batch.product_id}-${batch.batch_number}`} className="flex items-center justify-between text-sm">
+              {lowStocks.map((product) => (
+                <div key={`${product.product_id}-${product.sku || 'sku'}`} className="flex items-center justify-between text-sm">
                   <div>
-                    <p className="font-semibold text-slate-900">{batch.nama_produk}</p>
-                    <p className="text-xs text-slate-500">Batch {batch.batch_number}</p>
+                    <p className="font-semibold text-slate-900">{product.nama_produk}</p>
+                    <p className="text-xs text-slate-500">SKU {product.sku || '-'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-red-600">{formatNumber(batch.available)} pcs</p>
-                    <p className="text-xs text-slate-500">{batch.expiry_date || '-'}</p>
+                    <p className="font-semibold text-red-600">{formatNumber(product.available)} pcs</p>
                   </div>
                 </div>
               ))}
@@ -383,52 +374,37 @@ const AdminReportsPage = () => {
         {activeTab === 'stock' && (
           <div className="space-y-4">
             {loading.stock ? (
-              <p className="text-sm text-slate-500">Memuat stok batch...</p>
+              <p className="text-sm text-slate-500">Memuat data stok...</p>
             ) : groupedStock.length === 0 ? (
               <p className="text-sm text-slate-500">Tidak ada data stok untuk periode ini.</p>
             ) : (
-              groupedStock.map((product) => (
-                <div key={`${product.productName}-${product.sku || product.batches?.[0]?.product_id}`} className="rounded-xl border border-slate-100 p-4 space-y-3">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="grid gap-4">
+                {groupedStock.map((product, idx) => (
+                  <div
+                    key={`${product.productName}-${product.sku || idx}`}
+                    className="rounded-xl border border-slate-100 p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                  >
                     <div>
-                      <p className="font-semibold text-slate-900">{product.productName}</p>
+                      <p className="font-semibold text-slate-900">{product.productName || '-'}</p>
                       {product.sku && <p className="text-xs text-slate-500">SKU {product.sku}</p>}
                     </div>
                     <div className="flex gap-6 text-sm">
                       <div>
                         <p className="text-slate-500">Ready</p>
-                        <p className="text-lg font-bold text-slate-900">{formatNumber(product.totalQty)} pcs</p>
+                        <p className="text-lg font-bold text-slate-900">{formatNumber(product.ready)} pcs</p>
                       </div>
                       <div>
                         <p className="text-slate-500">Reserved</p>
-                        <p className="text-lg font-bold text-orange-600">{formatNumber(product.totalReserved)} pcs</p>
+                        <p className="text-lg font-bold text-orange-600">{formatNumber(product.reserved)} pcs</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Total</p>
+                        <p className="text-lg font-bold text-slate-900">{formatNumber(product.total)} pcs</p>
                       </div>
                     </div>
                   </div>
-                  <div className="overflow-x-auto rounded-lg border border-slate-100">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Batch</th>
-                          <th className="px-3 py-2 text-left">Ready</th>
-                          <th className="px-3 py-2 text-left">Reserved</th>
-                          <th className="px-3 py-2 text-left">Kadaluarsa</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {product.batches.map((batch, idx) => (
-                          <tr key={`${batch.batch_number}-${idx}`} className="border-t border-slate-50">
-                            <td className="px-3 py-2 font-medium text-slate-900">{batch.batch_number}</td>
-                            <td className="px-3 py-2">{formatNumber(batch.qty_remaining ?? 0)}</td>
-                            <td className="px-3 py-2 text-orange-600">{formatNumber(batch.reserved_qty ?? 0)}</td>
-                            <td className="px-3 py-2">{batch.expiry_date ?? '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         )}

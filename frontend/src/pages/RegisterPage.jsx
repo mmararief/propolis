@@ -206,7 +206,7 @@ const RegisterPage = () => {
               Hai, Selamat Datang!
             </h1>
             <p className="text-white font-ui font-normal text-base sm:text-lg lg:text-[18px] max-w-2xl mx-auto">
-              Daftarkan akun Anda dan nikmati kemudahan transaksi serta penawaran menarik untuk pelanggan dari reseller
+              Daftarkan akun Anda dan nikmati kemudahan transaksi serta penawaran menarik
             </p>
           </div>
 
@@ -309,23 +309,6 @@ const RegisterPage = () => {
                       }}
                       required
                     />
-                  </div>
-
-                  <div>
-                    <select
-                      value={form.role}
-                      onChange={(e) => setForm({ ...form, role: e.target.value })}
-                      className="w-full px-4 py-3 border-2 rounded-lg font-ui font-normal text-base outline-none transition-all"
-                      style={inputStyle}
-                      onFocus={(e) => Object.assign(e.target.style, inputFocusStyle)}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#D2001A';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    >
-                      <option value="pelanggan">Pelanggan</option>
-                      <option value="reseller">Reseller</option>
-                    </select>
                   </div>
                 </div>
               </div>

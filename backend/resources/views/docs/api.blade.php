@@ -94,12 +94,12 @@
             <tr>
                 <td><span class="badge get">GET</span></td>
                 <td><code>/api/products</code></td>
-                <td>Daftar produk + ringkasan stok batch.</td>
+                <td>Daftar produk + ringkasan stok.</td>
             </tr>
             <tr>
                 <td><span class="badge get">GET</span></td>
                 <td><code>/api/products/{id}</code></td>
-                <td>Detail produk, batch.</td>
+                <td>Detail produk.</td>
             </tr>
             <tr>
                 <td><span class="badge get">GET</span></td>
@@ -149,7 +149,7 @@
             <tr>
                 <td><span class="badge post">POST</span></td>
                 <td><code>/api/checkout</code></td>
-                <td>Buat order, reserve stok batch (body items, alamat, ongkir).</td>
+                <td>Buat order, reserve stok produk (body items, alamat, ongkir).</td>
             </tr>
             <tr>
                 <td><span class="badge post">POST</span></td>
@@ -188,16 +188,6 @@
                 <td>Perbarui produk.</td>
             </tr>
             <tr>
-                <td><span class="badge post">POST</span></td>
-                <td><code>/api/products/{id}/batches</code></td>
-                <td>Tambah batch stok baru.</td>
-            </tr>
-            <tr>
-                <td><span class="badge get">GET</span></td>
-                <td><code>/api/products/{id}/batches</code></td>
-                <td>Lihat daftar batch produk.</td>
-            </tr>
-            <tr>
                 <td><span class="badge get">GET</span></td>
                 <td><code>/api/admin/price-tiers</code></td>
                 <td>Daftar harga tingkat global (untuk admin).</td>
@@ -230,7 +220,7 @@
             <tr>
                 <td><span class="badge post">POST</span></td>
                 <td><code>/api/admin/orders/{id}/verify-payment</code></td>
-                <td>Verifikasi pembayaran + alokasi batch (panggil BatchAllocationService::allocate).</td>
+                <td>Verifikasi pembayaran + alokasi stok (panggil BatchAllocationService::allocate).</td>
             </tr>
             <tr>
                 <td><span class="badge post">POST</span></td>
@@ -245,12 +235,12 @@
             <tr>
                 <td><span class="badge get">GET</span></td>
                 <td><code>/api/reports/batch-stock</code></td>
-                <td>Laporan stok per batch.</td>
+                <td>Laporan stok per produk (legacy endpoint name).</td>
             </tr>
             <tr>
                 <td><span class="badge get">GET</span></td>
                 <td><code>/api/reports/batch-sales</code></td>
-                <td>Laporan penjualan per batch (param optional <code>from</code>, <code>to</code>).</td>
+                <td>Laporan penjualan per produk (param optional <code>from</code>, <code>to</code>).</td>
             </tr>
             </tbody>
         </table>
@@ -283,11 +273,11 @@
     </section>
 
     <section>
-        <h2>Catatan Batch Allocation</h2>
+        <h2>Catatan Allocation</h2>
         <ul>
-            <li>Checkout memanggil <code>BatchAllocationService::reserveForOrder()</code> → mengisi <code>reserved_qty</code>, <code>order_item_batches</code>, dan <code>reservation_expires_at</code>.</li>
-            <li>Admin verifikasi memanggil <code>BatchAllocationService::allocate()</code> → menurunkan <code>qty_remaining</code>, mencatat movement <code>sold</code>, menandai item sebagai <code>allocated</code>.</li>
-            <li>Command <code>orders:release-expired-reservations</code> melepas reservasi yang sudah lewat 30 menit.</li>
+            <li>Checkout memanggil <code>BatchAllocationService::reserveForOrder()</code> → menambah <code>products.stok_reserved</code> dan mengatur <code>reservation_expires_at</code>.</li>
+            <li>Admin verifikasi memanggil <code>BatchAllocationService::allocate()</code> → mengurangi <code>products.stok</code>, menurunkan <code>stok_reserved</code>, dan menandai item sebagai <code>allocated</code>.</li>
+            <li>Command <code>orders:release-expired-reservations</code> melepas reservasi yang lewat TTL dan mengembalikan stok.</li>
         </ul>
     </section>
 </body>

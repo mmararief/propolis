@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 
@@ -41,7 +41,6 @@ const createEmptyItem = () => ({
   product_id: '',
   qty: 1,
   price: '',
-  batches: [],
 });
 
 const AdminOrderManualPage = () => {
@@ -73,21 +72,30 @@ const AdminOrderManualPage = () => {
   });
   const [items, setItems] = useState([createEmptyItem()]);
   const [products, setProducts] = useState([]);
-  const [productDetails, setProductDetails] = useState({});
+  const [priceTiers, setPriceTiers] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [cities, setCities] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [subdistricts, setSubdistricts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [loadingBatchProductId, setLoadingBatchProductId] = useState(null);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
     fetchProducts();
     fetchProvinces();
+    fetchPriceTiers();
   }, []);
+
+  const fetchPriceTiers = async () => {
+    try {
+      const { data } = await api.get('/admin/price-tiers');
+      setPriceTiers(data.data ?? data ?? []);
+    } catch (err) {
+      console.error('Error loading price tiers:', err);
+    }
+  };
 
   useEffect(() => {
     if (form.customer.province_id) {
@@ -125,22 +133,6 @@ const AdminOrderManualPage = () => {
       setError(err.message);
     } finally {
       setLoadingProducts(false);
-    }
-  };
-
-  const loadProductDetail = async (productId) => {
-    if (!productId || productDetails[productId]) return;
-    setLoadingBatchProductId(productId);
-    try {
-      const { data } = await api.get(`/products/${productId}`);
-      setProductDetails((prev) => ({
-        ...prev,
-        [productId]: data.data ?? data,
-      }));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingBatchProductId(null);
     }
   };
 
@@ -245,21 +237,51 @@ const AdminOrderManualPage = () => {
     });
   };
 
+  const getPriceTierForQty = (qty) => {
+    if (!qty || qty <= 0) return null;
+    const qtyNum = Number(qty);
+    
+    // Cari tier yang sesuai dengan qty
+    const matchingTier = priceTiers
+      .filter(tier => tier.min_jumlah <= qtyNum && (!tier.max_jumlah || tier.max_jumlah >= qtyNum))
+      .sort((a, b) => b.min_jumlah - a.min_jumlah)[0]; // Ambil tier dengan min_jumlah terbesar
+    
+    return matchingTier;
+  };
+
+  const calculatePriceFromTier = (tier, qty) => {
+    if (!tier || !qty) return null;
+    // harga_total adalah total untuk min_jumlah, jadi hitung harga per item
+    const pricePerItem = tier.harga_total / tier.min_jumlah;
+    return pricePerItem * Number(qty);
+  };
+
   const updateItem = (itemId, field, value) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
         if (field === 'product_id') {
           const product = products.find((p) => p.id === Number(value));
-          if (value) {
-            loadProductDetail(value);
-          }
           return {
             ...item,
             product_id: value,
             price: product ? product.harga_ecer ?? 0 : item.price,
-            batches: [],
           };
+        }
+        if (field === 'qty') {
+          // Saat qty berubah, cek apakah ada tier yang sesuai dan update harga jika perlu
+          const updatedItem = { ...item, qty: value };
+          const tier = getPriceTierForQty(value);
+          if (tier) {
+            const suggestedPrice = tier.harga_total / tier.min_jumlah;
+            // Hanya update harga jika user belum mengubahnya secara manual
+            // Atau jika harga saat ini sama dengan harga dari tier sebelumnya
+            const currentTier = getPriceTierForQty(item.qty);
+            if (!currentTier || item.price === (currentTier.harga_total / currentTier.min_jumlah)) {
+              updatedItem.price = suggestedPrice;
+            }
+          }
+          return updatedItem;
         }
         return { ...item, [field]: value };
       }),
@@ -286,25 +308,6 @@ const AdminOrderManualPage = () => {
 
   const grandTotal = subtotal + (Number(form.shipping_cost) || 0);
 
-  const handleBatchQtyChange = (itemId, batchId, qty) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== itemId) return item;
-        const value = Math.max(0, Number(qty) || 0);
-        const otherBatches = item.batches.filter((batch) => batch.batch_id !== batchId);
-        const nextBatches = value > 0 ? [...otherBatches, { batch_id: batchId, qty: value }] : otherBatches;
-        const totalAllocated = nextBatches.reduce((sum, batch) => sum + (Number(batch.qty) || 0), 0);
-        return {
-          ...item,
-          batches: nextBatches,
-          qty: totalAllocated > 0 ? totalAllocated : item.qty,
-        };
-      }),
-    );
-  };
-
-  const getAllocatedQty = (item) => item.batches?.reduce((sum, batch) => sum + (Number(batch.qty) || 0), 0) || 0;
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -316,27 +319,11 @@ const AdminOrderManualPage = () => {
         product_id: Number(item.product_id),
         qty: Number(item.qty) || 0,
         price: Number(item.price) || 0,
-        batches: item.batches
-          ?.filter((batch) => Number(batch.qty) > 0)
-          .map((batch) => ({
-            batch_id: batch.batch_id,
-            qty: Number(batch.qty),
-          })),
       }));
 
     if (preparedItems.length === 0) {
       setError('Minimal pilih 1 produk.');
       return;
-    }
-
-    for (const item of preparedItems) {
-      if (item.batches && item.batches.length > 0) {
-        const allocated = item.batches.reduce((sum, batch) => sum + (Number(batch.qty) || 0), 0);
-        if (allocated !== item.qty) {
-          setError(`Total qty batch pada salah satu produk belum sama dengan jumlah pesanan (${allocated}/${item.qty}).`);
-          return;
-        }
-      }
     }
 
     setLoading(true);
@@ -625,54 +612,55 @@ const AdminOrderManualPage = () => {
               <tbody>
                 {items.map((item) => {
                   const selectedProduct = products.find((p) => p.id === Number(item.product_id));
-                  const productDetail = productDetails[item.product_id];
-                  const availableBatches = productDetail?.batches ?? [];
-                  const allocatedQty = getAllocatedQty(item);
+                  const readyStock =
+                    selectedProduct?.stok_available ??
+                    Math.max(0, (selectedProduct?.stok ?? 0) - (selectedProduct?.stok_reserved ?? 0));
+                  const reservedStock = selectedProduct?.stok_reserved ?? 0;
+
                   return (
-                    <Fragment key={item.id}>
-                      <tr className="border-b">
-                        <td className="py-2 pr-3 align-top">
-                          <div className="space-y-2">
-                            <select
-                              className="input-field w-full"
-                              value={item.product_id}
-                              onChange={(e) => updateItem(item.id, 'product_id', e.target.value)}
-                              disabled={loadingProducts}
-                            >
-                              <option value="">Pilih Produk</option>
-                              {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.nama_produk} ({product.sku})
-                                </option>
-                              ))}
-                            </select>
-                            {selectedProduct?.total_qty_remaining !== undefined && (
-                              <p className="text-xs text-slate-500">
-                                Stok ready:{' '}
-                                {Math.max(
-                                  0,
-                                  (selectedProduct.total_qty_remaining || 0) - (selectedProduct.total_reserved_qty || 0),
-                                )}{' '}
-                                pcs
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="number"
-                            min="1"
+                    <tr key={item.id} className="border-b">
+                      <td className="py-2 pr-3 align-top">
+                        <div className="space-y-2">
+                          <select
                             className="input-field w-full"
-                            value={item.qty}
-                            onChange={(e) => updateItem(item.id, 'qty', e.target.value)}
-                          />
-                          {item.batches?.length > 0 && (
-                            <p className="text-[11px] text-slate-500 mt-1">
-                              Dialokasikan: {allocatedQty}/{item.qty}
+                            value={item.product_id}
+                            onChange={(e) => updateItem(item.id, 'product_id', e.target.value)}
+                            disabled={loadingProducts}
+                          >
+                            <option value="">Pilih Produk</option>
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.nama_produk} ({product.sku})
+                              </option>
+                            ))}
+                          </select>
+                          {selectedProduct && (
+                            <p className="text-xs text-slate-500">
+                              Ready:{' '}
+                              <span className="font-semibold text-slate-900">
+                                {readyStock}
+                              </span>{' '}
+                              pcs · Reserved: {reservedStock} pcs
                             </p>
                           )}
-                        </td>
-                        <td className="py-2 pr-3">
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3">
+                        <input
+                          type="number"
+                          min="1"
+                          className="input-field w-full"
+                          value={item.qty}
+                          onChange={(e) => updateItem(item.id, 'qty', e.target.value)}
+                        />
+                        {selectedProduct && readyStock < Number(item.qty || 0) && (
+                          <p className="text-[11px] text-red-600 mt-1">
+                            Jumlah melebihi stok ready ({readyStock} pcs)
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <div className="space-y-1">
                           <input
                             type="number"
                             min="0"
@@ -680,112 +668,45 @@ const AdminOrderManualPage = () => {
                             value={item.price}
                             onChange={(e) => updateItem(item.id, 'price', e.target.value)}
                           />
-                        </td>
-                        <td className="py-2 pr-3 font-semibold text-slate-900">
-                          Rp {((Number(item.qty) || 0) * (Number(item.price) || 0)).toLocaleString('id-ID')}
-                        </td>
-                        <td className="py-2 text-right">
-                          <button
-                            type="button"
-                            className="text-red-500 text-xs font-semibold"
-                            onClick={() => removeItemRow(item.id)}
-                            disabled={items.length === 1}
-                          >
-                            Hapus
-                          </button>
-                        </td>
-                      </tr>
-                      {item.product_id && (
-                        <tr className="border-b bg-slate-50">
-                          <td colSpan={5} className="p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-900">Pilih Batch</p>
-                                <p className="text-xs text-slate-500">
-                                  Atur batch secara manual agar gudang tahu stok mana yang dipakai.
+                          {(() => {
+                            const tier = getPriceTierForQty(item.qty);
+                            if (tier) {
+                              const suggestedPrice = tier.harga_total / tier.min_jumlah;
+                              const isUsingTierPrice = Math.abs(Number(item.price) - suggestedPrice) < 0.01;
+                              return (
+                                <p className="text-[11px] text-slate-500">
+                                  {isUsingTierPrice ? (
+                                    <span className="text-green-600 font-semibold">
+                                      ✓ {tier.label || 'Tier'} ({tier.min_jumlah}
+                                      {tier.max_jumlah ? `-${tier.max_jumlah}` : '+'} item)
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      Saran: {tier.label || 'Tier'} - Rp{' '}
+                                      {suggestedPrice.toLocaleString('id-ID')}/item
+                                    </span>
+                                  )}
                                 </p>
-                              </div>
-                              {loadingBatchProductId === item.product_id && (
-                                <span className="text-xs text-slate-400">Memuat batch...</span>
-                              )}
-                              {!productDetail && loadingBatchProductId !== item.product_id && (
-                                <button
-                                  type="button"
-                                  className="text-xs text-blue-600"
-                                  onClick={() => loadProductDetail(item.product_id)}
-                                >
-                                  Muat Daftar Batch
-                                </button>
-                              )}
-                            </div>
-                            {productDetail ? (
-                              availableBatches.length > 0 ? (
-                                <div className="grid md:grid-cols-3 gap-3">
-                                  {availableBatches.map((batch) => {
-                                    const available = Math.max(
-                                      0,
-                                      (Number(batch.qty_remaining) || 0) - (Number(batch.reserved_qty) || 0),
-                                    );
-                                    if (available <= 0) {
-                                      return (
-                                        <div
-                                          key={batch.id}
-                                          className="border border-slate-200 rounded-lg p-3 bg-white opacity-60"
-                                        >
-                                          <p className="text-sm font-semibold text-slate-600">
-                                            Batch {batch.batch_number}
-                                          </p>
-                                          <p className="text-xs text-slate-500">Stok habis</p>
-                                        </div>
-                                      );
-                                    }
-                                    const currentQty =
-                                      item.batches?.find((selected) => selected.batch_id === batch.id)?.qty ?? '';
-                                    return (
-                                      <div key={batch.id} className="border border-slate-200 rounded-lg p-3 bg-white">
-                                        <div className="flex items-center justify-between mb-1">
-                                          <p className="text-sm font-semibold text-slate-900">
-                                            Batch {batch.batch_number}
-                                          </p>
-                                          {batch.expiry_date && (
-                                            <span className="text-[11px] text-slate-500">
-                                              Exp:{' '}
-                                              {new Date(batch.expiry_date).toLocaleDateString('id-ID', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric',
-                                              })}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <p className="text-xs text-slate-500 mb-2">Stok: {available} pcs</p>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max={available}
-                                          className="input-field w-full"
-                                          value={currentQty}
-                                          onChange={(e) => {
-                                            const nextValue = Math.min(available, Number(e.target.value) || 0);
-                                            handleBatchQtyChange(item.id, batch.id, nextValue);
-                                          }}
-                                        />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-slate-500">Belum ada batch tersedia untuk produk ini.</p>
-                              )
-                            ) : (
-                              <p className="text-sm text-slate-500">
-                                Tekan tombol "Muat Daftar Batch" untuk melihat stok batch.
-                              </p>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3 font-semibold text-slate-900">
+                        Rp {((Number(item.qty) || 0) * (Number(item.price) || 0)).toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-2 text-right">
+                        <button
+                          type="button"
+                          className="text-red-500 text-xs font-semibold"
+                          onClick={() => removeItemRow(item.id)}
+                          disabled={items.length === 1}
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>

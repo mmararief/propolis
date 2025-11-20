@@ -1,9 +1,17 @@
 /**
  * Get full URL for product image
- * @param {string|null|undefined} imagePath - Image path from backend (e.g., "/storage/products/filename.png")
- * @returns {string} Full URL to the image or placeholder
+ * @param {string|string[]|null|undefined} imagePath - Image path from backend (e.g., "/storage/products/filename.png") or array of paths
+ * @returns {string|null} Full URL to the image or null
  */
 export const getProductImageUrl = (imagePath) => {
+  // Handle array - get first image
+  if (Array.isArray(imagePath)) {
+    if (imagePath.length === 0) {
+      return null;
+    }
+    imagePath = imagePath[0];
+  }
+
   if (!imagePath) {
     return null; // Return null so we can show placeholder
   }

@@ -4,11 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use OpenApi\Annotations as OA;
 
 class CategoryController extends Controller
 {
     /**
-     * Get all categories
+     * @OA\Get(
+     *     path="/admin/categories",
+     *     tags={"Admin"},
+     *     summary="Daftar semua kategori",
+     *     security={{"sanctum": {}}},
+     *     @OA\Response(response=200, description="Daftar kategori")
+     * )
      */
     public function index()
     {
@@ -19,7 +26,21 @@ class CategoryController extends Controller
     }
 
     /**
-     * Create a new category
+     * @OA\Post(
+     *     path="/admin/categories",
+     *     tags={"Admin"},
+     *     summary="Buat kategori baru",
+     *     security={{"sanctum": {}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"nama_kategori"},
+     *             @OA\Property(property="nama_kategori", type="string", example="Kategori Baru")
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Kategori berhasil dibuat"),
+     *     @OA\Response(response=422, description="Validasi gagal")
+     * )
      */
     public function store(Request $request)
     {
@@ -35,7 +56,23 @@ class CategoryController extends Controller
     }
 
     /**
-     * Update a category
+     * @OA\Put(
+     *     path="/admin/categories/{id}",
+     *     tags={"Admin"},
+     *     summary="Update kategori",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"nama_kategori"},
+     *             @OA\Property(property="nama_kategori", type="string", example="Kategori Updated")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Kategori berhasil diupdate"),
+     *     @OA\Response(response=404, description="Kategori tidak ditemukan"),
+     *     @OA\Response(response=422, description="Validasi gagal")
+     * )
      */
     public function update(Request $request, int $id)
     {
@@ -53,7 +90,16 @@ class CategoryController extends Controller
     }
 
     /**
-     * Delete a category
+     * @OA\Delete(
+     *     path="/admin/categories/{id}",
+     *     tags={"Admin"},
+     *     summary="Hapus kategori",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Kategori berhasil dihapus"),
+     *     @OA\Response(response=404, description="Kategori tidak ditemukan"),
+     *     @OA\Response(response=422, description="Kategori tidak dapat dihapus karena masih memiliki produk")
+     * )
      */
     public function destroy(int $id)
     {

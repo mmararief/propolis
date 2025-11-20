@@ -15,9 +15,9 @@ const ProductDetailPage = () => {
   const [priceTiers, setPriceTiers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { addItem } = useCart();
-  const [selectedVariant, setSelectedVariant] = useState('botol');
+  const { addItem, clearCart } = useCart();
   const [quantity, setQuantity] = useState(1);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -48,9 +48,15 @@ const ProductDetailPage = () => {
     fetchDetail();
   }, [id]);
 
+  const getAvailableStock = () => {
+    if (!product) return 0;
+    if (typeof product.stok_available === 'number') return Math.max(0, product.stok_available);
+    return Math.max(0, (product.stok || 0) - (product.stok_reserved || 0));
+  };
+
   const handleQuantityChange = (delta) => {
     const newQuantity = quantity + delta;
-    const available = product?.batches?.reduce((sum, batch) => sum + (batch.qty_remaining || 0), 0) || 0;
+    const available = getAvailableStock();
     if (newQuantity >= 1 && newQuantity <= available) {
       setQuantity(newQuantity);
     }
@@ -62,10 +68,21 @@ const ProductDetailPage = () => {
     }
   };
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (product) {
-      addItem(product, quantity);
-      navigate('/cart');
+      try {
+        // Clear cart first for "Buy Now" behavior
+        await clearCart();
+        // Add the selected product
+        await addItem(product, quantity);
+        // Navigate to checkout
+        navigate('/checkout');
+      } catch (err) {
+        console.error('Failed to process buy now:', err);
+        // Fallback: just add to cart and navigate
+        addItem(product, quantity);
+        navigate('/checkout');
+      }
     }
   };
 
@@ -148,8 +165,10 @@ const ProductDetailPage = () => {
 
   if (!product) return null;
 
-  const available = product.batches?.reduce((sum, batch) => sum + (batch.qty_remaining || 0), 0) || 0;
-  const price = selectedVariant === 'dus' ? (product.harga_grosir || product.harga_ecer) : product.harga_ecer;
+  const available = getAvailableStock();
+  const price = product.harga_ecer;
+  const images = Array.isArray(product.gambar) ? product.gambar : (product.gambar ? [product.gambar] : []);
+  const currentImage = images[selectedImageIndex] || null;
 
   return (
     <div className="relative bg-white min-h-screen overflow-x-hidden pt-[100px] pb-20">
@@ -182,25 +201,55 @@ const ProductDetailPage = () => {
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-16">
           {/* Product Images - Left */}
           <div className="w-full lg:w-1/2">
-            <div className="relative w-full aspect-square bg-[#f1f1f1] rounded-lg overflow-hidden flex items-center justify-center p-8">
-              {product.gambar ? (
-                <img
-                  src={getProductImageUrl(product.gambar)}
-                  alt={product.nama_produk}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <div
-                className={`w-full h-full bg-white flex items-center justify-center text-slate-400 text-sm ${
-                  product.gambar ? 'hidden' : ''
-                }`}
-              >
-                Gambar Produk
+            <div className="space-y-4">
+              {/* Main Image */}
+              <div className="relative w-full aspect-square bg-[#f1f1f1] rounded-lg overflow-hidden flex items-center justify-center p-8">
+                {currentImage ? (
+                  <img
+                    src={getProductImageUrl(currentImage)}
+                    alt={product.nama_produk}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-full h-full bg-white flex items-center justify-center text-slate-400 text-sm ${
+                    currentImage ? 'hidden' : ''
+                  }`}
+                >
+                  Gambar Produk
+                </div>
               </div>
+              
+              {/* Thumbnail Gallery */}
+              {images.length > 1 && (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {images.map((image, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedImageIndex(idx)}
+                      className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                        selectedImageIndex === idx
+                          ? 'border-[#D2001A] ring-2 ring-[#D2001A] ring-opacity-30'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <img
+                        src={getProductImageUrl(image)}
+                        alt={`${product.nama_produk} - Gambar ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/80?text=No+Image';
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -254,45 +303,6 @@ const ProductDetailPage = () => {
                 </div>
               </div>
             )}
-
-            {/* Variants */}
-            <div className="mb-6">
-              <p className="text-black font-ui font-semibold text-[18px] mb-3">
-                Pilih Varian:
-              </p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setSelectedVariant('botol')}
-                  className={`px-6 py-3 rounded-lg font-ui font-semibold text-[16px] transition-all ${
-                    selectedVariant === 'botol'
-                      ? 'text-white'
-                      : 'bg-[#f1f1f1] text-black hover:bg-gray-200'
-                  }`}
-                  style={
-                    selectedVariant === 'botol'
-                      ? { backgroundColor: '#D2001A' }
-                      : {}
-                  }
-                >
-                  Botol
-                </button>
-                <button
-                  onClick={() => setSelectedVariant('dus')}
-                  className={`px-6 py-3 rounded-lg font-ui font-semibold text-[16px] transition-all ${
-                    selectedVariant === 'dus'
-                      ? 'text-white'
-                      : 'bg-[#f1f1f1] text-black hover:bg-gray-200'
-                  }`}
-                  style={
-                    selectedVariant === 'dus'
-                      ? { backgroundColor: '#D2001A' }
-                      : {}
-                  }
-                >
-                  Dus
-                </button>
-              </div>
-            </div>
 
             {/* Quantity Selector */}
             <div className="mb-6">

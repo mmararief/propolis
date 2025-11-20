@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 import { getProductImageUrl } from '../../utils/imageHelper';
 
@@ -8,6 +8,10 @@ const AdminProductsPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [stockQty, setStockQty] = useState('');
+  const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -38,13 +42,46 @@ const AdminProductsPage = () => {
     }
   };
 
+  const handleOpenStockModal = (product) => {
+    setSelectedProduct(product);
+    setStockQty('');
+    setShowStockModal(true);
+  };
+
+  const handleCloseStockModal = () => {
+    setShowStockModal(false);
+    setSelectedProduct(null);
+    setStockQty('');
+  };
+
+  const handleAddStock = async (e) => {
+    e.preventDefault();
+    if (!selectedProduct || !stockQty || stockQty === '0') {
+      alert('Masukkan jumlah stok yang valid');
+      return;
+    }
+
+    setStockLoading(true);
+    try {
+      await api.post(`/products/${selectedProduct.id}/add-stock`, {
+        qty: parseInt(stockQty),
+      });
+      handleCloseStockModal();
+      fetchProducts();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Gagal menambah stok');
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Kelola Produk</h1>
-          <p className="text-sm text-slate-500">Daftar semua produk dan kelola batch stok</p>
+          <p className="text-sm text-slate-500">Daftar semua produk dan pantau stok tersedia.</p>
         </div>
         <button
           type="button"
@@ -136,7 +173,17 @@ const AdminProductsPage = () => {
                         </span>
                       </td>
                       <td className="py-3">
-                        <span className="text-slate-600">{product.stok ?? 0}</span>
+                        <div className="text-slate-600 text-sm">
+                          <p>
+                            Ready:{' '}
+                            <span className="font-semibold text-slate-900">
+                              {product.stok_available ?? Math.max(0, (product.stok ?? 0) - (product.stok_reserved ?? 0))}
+                            </span>
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Reserved: {product.stok_reserved ?? 0} | Total: {product.stok ?? 0}
+                          </p>
+                        </div>
                       </td>
                       <td className="py-3">
                         <span
@@ -150,29 +197,28 @@ const AdminProductsPage = () => {
                         </span>
                       </td>
                       <td className="py-3">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              className="btn-outline px-3 py-1 text-xs"
-                              onClick={() => navigate(`/admin/products/${product.id}/edit`)}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-primary px-3 py-1 text-xs bg-red-600 hover:bg-red-700"
-                              onClick={() => handleDelete(product.id)}
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                          <Link
-                            to={`/admin/products/${product.id}/batches`}
-                            className="btn-outline px-3 py-1 text-xs text-center"
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="btn-outline px-3 py-1 text-xs"
+                            onClick={() => navigate(`/admin/products/${product.id}/edit`)}
                           >
-                            Kelola Batch
-                          </Link>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700"
+                            onClick={() => handleOpenStockModal(product)}
+                          >
+                            + Stok
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary px-3 py-1 text-xs bg-red-600 hover:bg-red-700"
+                            onClick={() => handleDelete(product.id)}
+                          >
+                            Hapus
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -183,6 +229,67 @@ const AdminProductsPage = () => {
           </>
         )}
       </div>
+
+      {/* Modal Tambah Stok */}
+      {showStockModal && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">
+              Tambah Stok Produk
+            </h2>
+            <p className="text-sm text-slate-600 mb-2">
+              <strong>{selectedProduct.nama_produk}</strong>
+            </p>
+            <p className="text-xs text-slate-500 mb-4">
+              Stok saat ini: <strong>{selectedProduct.stok ?? 0}</strong>
+            </p>
+            <form onSubmit={handleAddStock}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Jumlah Stok <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  className="input-field w-full"
+                  value={stockQty}
+                  onChange={(e) => setStockQty(e.target.value)}
+                  placeholder="Masukkan jumlah stok"
+                  required
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Masukkan angka positif untuk menambah, angka negatif untuk mengurangi
+                </p>
+                {stockQty && parseInt(stockQty) !== 0 && (
+                  <p className="text-sm mt-2">
+                    Stok setelah perubahan:{' '}
+                    <strong className="text-blue-600">
+                      {(selectedProduct.stok ?? 0) + parseInt(stockQty)}
+                    </strong>
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={stockLoading || !stockQty || stockQty === '0'}
+                >
+                  {stockLoading ? 'Menyimpan...' : 'Simpan'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={handleCloseStockModal}
+                  disabled={stockLoading}
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

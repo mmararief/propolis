@@ -1,6 +1,5 @@
 <?php
 
-use App\Console\Commands\BatchReportExpiring;
 use App\Console\Commands\OrdersReleaseExpiredReservations;
 use App\Console\Commands\SyncShipmentTrackingCommand;
 use Illuminate\Console\Scheduling\Schedule;
@@ -17,7 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         OrdersReleaseExpiredReservations::class,
-        BatchReportExpiring::class,
         SyncShipmentTrackingCommand::class,
     ])
     ->withSchedule(function (Schedule $schedule) {

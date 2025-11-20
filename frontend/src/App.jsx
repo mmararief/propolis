@@ -19,10 +19,6 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminCategoriesPage from "./pages/admin/AdminCategoriesPage";
 import AdminProductsPage from "./pages/admin/AdminProductsPage";
 import AdminProductFormPage from "./pages/admin/AdminProductFormPage";
-import AdminBatchesPage from "./pages/admin/AdminBatchesPage";
-import AdminBatchFormPage from "./pages/admin/AdminBatchFormPage";
-import AdminBatchEditPage from "./pages/admin/AdminBatchEditPage";
-import AdminBatchRestockPage from "./pages/admin/AdminBatchRestockPage";
 import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
 import AdminOrderManualPage from "./pages/admin/AdminOrderManualPage";
 import AdminReportsPage from "./pages/admin/AdminReportsPage";
@@ -135,22 +131,6 @@ const App = () => (
         <Route path="products" element={<AdminProductsPage />} />
         <Route path="products/new" element={<AdminProductFormPage />} />
         <Route path="products/:id/edit" element={<AdminProductFormPage />} />
-        <Route
-          path="products/:productId/batches"
-          element={<AdminBatchesPage />}
-        />
-        <Route
-          path="products/:productId/batches/new"
-          element={<AdminBatchFormPage />}
-        />
-        <Route
-          path="products/:productId/batches/:id/edit"
-          element={<AdminBatchEditPage />}
-        />
-        <Route
-          path="products/:productId/batches/:id/restock"
-          element={<AdminBatchRestockPage />}
-        />
         <Route path="orders" element={<AdminOrdersPage />} />
         <Route path="orders/manual" element={<AdminOrderManualPage />} />
         <Route path="price-tiers" element={<AdminPriceTiersPage />} />

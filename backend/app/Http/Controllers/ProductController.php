@@ -47,9 +47,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with(['category'])
-            ->withSum('batches as total_qty_remaining', 'qty_remaining')
-            ->withSum('batches as total_reserved_qty', 'reserved_qty');
+            ->with(['category']);
 
         if ($request->filled('status')) {
             $products->where('status', $request->string('status'));
@@ -89,21 +87,7 @@ class ProductController extends Controller
 
     public function show(int $id)
     {
-        $product = Product::with([
-            'category',
-            'batches' => function ($query) {
-                $query->orderBy('expiry_date')->select([
-                    'id',
-                    'product_id',
-                    'batch_number',
-                    'qty_initial',
-                    'qty_remaining',
-                    'reserved_qty',
-                    'expiry_date',
-                    'purchase_price',
-                ]);
-            },
-        ])->findOrFail($id);
+        $product = Product::with(['category'])->findOrFail($id);
 
         return $this->success($product);
     }
@@ -143,18 +127,35 @@ class ProductController extends Controller
             'deskripsi' => ['nullable', 'string'],
             'harga_ecer' => ['required', 'numeric', 'min:0'],
             'stok' => ['nullable', 'integer', 'min:0'],
-            'gambar' => ['nullable', 'string', 'max:255'],
-            'gambar_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'gambar' => ['nullable', 'array'],
+            'gambar.*' => ['nullable', 'string', 'max:255'],
+            'gambar_file' => ['nullable', 'array'],
+            'gambar_file.*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'berat' => ['nullable', 'integer', 'min:1'],
             'status' => ['required', 'in:aktif,nonaktif'],
         ]);
 
-        // Handle file upload
+        // Handle multiple file uploads
+        $uploadedImages = [];
         if ($request->hasFile('gambar_file')) {
-            $file = $request->file('gambar_file');
-            $filename = time() . '_' . $file->getClientOriginalName();
-            $path = $file->storeAs('products', $filename, 'public');
-            $data['gambar'] = Storage::url($path);
+            foreach ($request->file('gambar_file') as $file) {
+                if ($file && $file->isValid()) {
+                    $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                    $path = $file->storeAs('products', $filename, 'public');
+                    $uploadedImages[] = Storage::url($path);
+                }
+            }
+        }
+
+        // Merge with existing images if provided
+        if (!empty($uploadedImages)) {
+            $existingImages = $data['gambar'] ?? [];
+            $data['gambar'] = array_merge($existingImages, $uploadedImages);
+        } elseif (isset($data['gambar']) && is_array($data['gambar'])) {
+            // Keep existing images if no new uploads
+            $data['gambar'] = array_filter($data['gambar']);
+        } else {
+            $data['gambar'] = null;
         }
 
         // Set default berat if not provided
@@ -204,29 +205,95 @@ class ProductController extends Controller
             'deskripsi' => ['nullable', 'string'],
             'harga_ecer' => ['sometimes', 'numeric', 'min:0'],
             'stok' => ['nullable', 'integer', 'min:0'],
-            'gambar' => ['nullable', 'string', 'max:255'],
-            'gambar_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'gambar' => ['nullable', 'array'],
+            'gambar.*' => ['nullable', 'string', 'max:255'],
+            'gambar_file' => ['nullable', 'array'],
+            'gambar_file.*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'gambar_hapus' => ['nullable', 'array'],
+            'gambar_hapus.*' => ['nullable', 'string'],
             'berat' => ['nullable', 'integer', 'min:1'],
             'status' => ['sometimes', 'in:aktif,nonaktif'],
         ]);
 
-        // Handle file upload
-        if ($request->hasFile('gambar_file')) {
-            // Delete old image if exists
-            if ($product->gambar) {
-                $oldPath = str_replace('/storage/', '', $product->gambar);
-                Storage::disk('public')->delete($oldPath);
+        // Handle deletion of images
+        $currentImages = $product->gambar ?? [];
+        if ($request->has('gambar_hapus') && is_array($request->gambar_hapus)) {
+            foreach ($request->gambar_hapus as $imageToDelete) {
+                $oldPath = str_replace('/storage/', '', $imageToDelete);
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+                $currentImages = array_filter($currentImages, fn($img) => $img !== $imageToDelete);
             }
+            $currentImages = array_values($currentImages); // Re-index array
+        }
 
-            $file = $request->file('gambar_file');
-            $filename = time() . '_' . $file->getClientOriginalName();
-            $path = $file->storeAs('products', $filename, 'public');
-            $data['gambar'] = Storage::url($path);
+        // Handle multiple file uploads
+        $uploadedImages = [];
+        if ($request->hasFile('gambar_file')) {
+            foreach ($request->file('gambar_file') as $file) {
+                if ($file && $file->isValid()) {
+                    $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                    $path = $file->storeAs('products', $filename, 'public');
+                    $uploadedImages[] = Storage::url($path);
+                }
+            }
+        }
+
+        // Merge existing and new images
+        if (!empty($uploadedImages)) {
+            $data['gambar'] = array_merge($currentImages, $uploadedImages);
+        } elseif (isset($data['gambar']) && is_array($data['gambar'])) {
+            $data['gambar'] = array_filter($data['gambar']);
+        } else {
+            $data['gambar'] = !empty($currentImages) ? $currentImages : null;
         }
 
         $product->fill($data)->save();
 
         return $this->success($product->fresh(), 'Produk berhasil diperbarui');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/products/{id}/add-stock",
+     *     tags={"Products"},
+     *     summary="Tambah stok produk",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"qty"},
+     *             @OA\Property(property="qty", type="integer", example=10, description="Jumlah stok yang ditambahkan (bisa negatif untuk mengurangi)")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Stok berhasil ditambahkan"),
+     *     @OA\Response(response=404, description="Produk tidak ditemukan"),
+     *     @OA\Response(response=422, description="Validasi gagal")
+     * )
+     */
+    public function addStock(Request $request, int $id)
+    {
+        $this->authorize('admin');
+
+        $product = Product::findOrFail($id);
+
+        $data = $request->validate([
+            'qty' => ['required', 'integer'],
+        ]);
+
+        $newStock = $product->stok + $data['qty'];
+
+        // Pastikan stok tidak negatif
+        if ($newStock < 0) {
+            return $this->fail('Stok tidak boleh negatif. Stok saat ini: ' . $product->stok, 422);
+        }
+
+        $product->stok = $newStock;
+        $product->save();
+
+        return $this->success($product->fresh(), 'Stok berhasil diperbarui');
     }
 
     /**
@@ -245,11 +312,13 @@ class ProductController extends Controller
 
         $product = Product::findOrFail($id);
 
-        // Delete image if exists
-        if ($product->gambar) {
-            $imagePath = str_replace('/storage/', '', $product->gambar);
-            if (Storage::disk('public')->exists($imagePath)) {
-                Storage::disk('public')->delete($imagePath);
+        // Delete all images if exists
+        if ($product->gambar && is_array($product->gambar)) {
+            foreach ($product->gambar as $image) {
+                $imagePath = str_replace('/storage/', '', $image);
+                if (Storage::disk('public')->exists($imagePath)) {
+                    Storage::disk('public')->delete($imagePath);
+                }
             }
         }
 

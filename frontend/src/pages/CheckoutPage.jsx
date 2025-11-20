@@ -214,7 +214,8 @@ const CheckoutPage = () => {
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-8">
+          <>
+          <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
             {/* Left Column - Forms */}
             <div className="grow space-y-6">
               {/* Shipping Address */}
@@ -244,12 +245,14 @@ const CheckoutPage = () => {
                   </span>
                   Alamat Pengiriman
                 </h2>
-                <div className="bg-gray-50 p-4 rounded">
+                <div className="space-y-1">
                   <p className="font-ui font-medium text-gray-900">
-                    {user?.nama_lengkap || 'User'} {user?.no_hp ? `(+62) ${user.no_hp}` : ''}
+                    {user?.nama_lengkap || 'User'} {user?.no_hp ? `(+62) ${user.no_hp.replace(/\s/g, '')}` : ''}
                   </p>
-                  <p className="text-gray-600 mt-1 font-ui text-sm">
+                  <p className="text-gray-600 font-ui text-sm leading-relaxed">
                     {form.address || defaultAddress?.address || user?.alamat_lengkap || 'Belum ada alamat'}
+                    {defaultAddress?.subdistrict_name && `, ${defaultAddress.subdistrict_name}`}
+                    {defaultAddress?.district_name && `, ${defaultAddress.district_name}`}
                     {defaultAddress?.city_name && `, ${defaultAddress.city_name}`}
                     {defaultAddress?.province_name && `, ${defaultAddress.province_name}`}
                     {defaultAddress?.postal_code && `, ${defaultAddress.postal_code}`}
@@ -278,84 +281,102 @@ const CheckoutPage = () => {
                   </span>
                   Produk Dipesan
                 </h2>
-                <div className="space-y-4">
-                  {enrichedItems.map((item) => (
-                    <div
-                      key={item.product.id}
-                      className="flex items-center justify-between py-4 border-b last:border-0"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-[#f1f1f1] rounded flex items-center justify-center overflow-hidden relative">
-                          {item.product.gambar ? (
-                            <img
-                              src={getProductImageUrl(item.product.gambar)}
-                              alt={item.product.nama_produk}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <span className={`text-xs text-slate-400 ${item.product.gambar ? 'hidden' : ''}`}>Gambar</span>
-                        </div>
-                        <div>
-                          <h3 className="font-ui font-medium text-gray-900">
-                            {item.product.nama_produk}
-                          </h3>
-                          <p className="text-sm text-gray-500 font-ui">Varian: Botol</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-ui font-medium text-gray-900">
-                          {formatPrice(item.unitPrice || 250000)}
-                        </div>
-                        <div className="text-sm text-gray-500 font-ui">Jumlah: {item.qty}</div>
-                        {item.activeTier ? (
-                          <p className="text-xs text-slate-500">
-                            Tier: {item.activeTier.label || `≥ ${item.activeTier.min_jumlah}${item.activeTier.max_jumlah ? ` - ${item.activeTier.max_jumlah}` : ''} pcs`}
-                          </p>
-                        ) : null}
-                        <div
-                          className="font-ui font-medium"
-                          style={{ color: '#D2001A' }}
-                        >
-                          {formatPrice((item.unitPrice || 250000) * item.qty)}
-                        </div>
-                        {item.nextTier && (
-                          <p className="text-xs text-slate-500">
-                            Tambah {item.nextTier.min_jumlah - item.qty} pcs lagi untuk harga{' '}
-                            {item.nextTier.label || `≥ ${item.nextTier.min_jumlah} pcs`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <div className="pt-4">
+                
+                {/* Product Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 font-ui font-semibold text-gray-900">Produk</th>
+                        <th className="text-right py-3 font-ui font-semibold text-gray-900">Harga Satuan</th>
+                        <th className="text-center py-3 font-ui font-semibold text-gray-900">Jumlah</th>
+                        <th className="text-right py-3 font-ui font-semibold text-gray-900">Total Harga Produk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enrichedItems.map((item) => (
+                        <tr key={item.product.id} className="border-b border-gray-100 last:border-0">
+                          <td className="py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-16 h-16 bg-[#f1f1f1] rounded flex items-center justify-center overflow-hidden relative shrink-0">
+                                {item.product.gambar ? (
+                                  <img
+                                    src={getProductImageUrl(item.product.gambar)}
+                                    alt={item.product.nama_produk}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      if (e.target.nextSibling) {
+                                        e.target.nextSibling.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <span className={`text-xs text-slate-400 ${item.product.gambar ? 'hidden' : 'flex items-center justify-center'}`}>
+                                  Gambar
+                                </span>
+                              </div>
+                              <div>
+                                <h3 className="font-ui font-medium text-gray-900">
+                                  {item.product.nama_produk}
+                                </h3>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="text-right py-4">
+                            <span className="font-ui font-medium text-gray-900">
+                              {formatPrice(item.unitPrice || 250000)}
+                            </span>
+                          </td>
+                          <td className="text-center py-4">
+                            <span className="font-ui font-medium text-gray-900">
+                              {item.qty}
+                            </span>
+                          </td>
+                          <td className="text-right py-4">
+                            <span
+                              className="font-ui font-semibold text-gray-900"
+                            >
+                              {formatPrice((item.unitPrice || 250000) * item.qty)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Message Input */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="flex items-start gap-4">
+                    <label className="font-ui font-semibold text-gray-900 pt-2 shrink-0">
+                      Pesan:
+                    </label>
                     <textarea
-                      placeholder="[Opsional] Tinggalkan pesan..."
+                      placeholder="(Opsional) Tinggalkan pesan"
                       value={form.pesan}
                       onChange={(e) => setForm({ ...form, pesan: e.target.value })}
-                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-offset-0 font-ui text-sm"
+                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-offset-0 font-ui text-sm focus:outline-none"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
                       rows={3}
                     />
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t">
+
+                {/* Order Summary */}
+                <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                   <div className="flex justify-between items-center font-ui text-gray-600">
                     <span>Biaya Pengiriman:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900">
                       {shippingLoading ? 'Menghitung...' : formatPrice(form.ongkos_kirim || 0)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="font-ui text-gray-600">
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                    <span className="font-ui font-semibold text-gray-900">
                       Total Pesanan ({totalItems} Produk):
                     </span>
                     <span
-                      className="font-ui font-medium"
-                      style={{ color: '#D2001A' }}
+                      className="font-ui font-bold text-xl text-gray-900"
                     >
                       {formatPrice(grandTotal)}
                     </span>
@@ -570,29 +591,77 @@ const CheckoutPage = () => {
                 </div>
               </div>
             </div>
-
-            {/* Right Column - Order Button */}
-            <div className="lg:w-80">
-              <div className="bg-white rounded-lg shadow-md p-6 sticky top-[120px] space-y-3">
-                {!selectedService && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-                    Hitung ongkir dan pilih layanan kurir terlebih dahulu untuk melanjutkan.
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  disabled={loading || shippingLoading || !selectedService || !form.courier_service}
-                  className="w-full py-3 rounded-lg font-ui font-semibold text-[16px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: '#D2001A' }}
-                >
-                  {loading ? 'Memproses...' : 'Buat Pesanan'}
-                </button>
-                {error && (
-                  <p className="text-red-500 text-sm font-ui">{error}</p>
-                )}
-              </div>
-            </div>
           </form>
+
+          {/* Bottom Order Button - Mobile */}
+          <div className="mt-8 lg:hidden">
+            <div className="bg-white rounded-lg shadow-lg p-4 space-y-3 border-t-4" style={{ borderTopColor: '#D2001A' }}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-ui font-semibold text-gray-900">Total:</span>
+                <span
+                  className="font-ui font-bold text-xl"
+                  style={{ color: '#D2001A' }}
+                >
+                  {formatPrice(grandTotal)}
+                </span>
+              </div>
+              {!selectedService && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800 mb-2">
+                  Hitung ongkir dan pilih layanan kurir terlebih dahulu.
+                </div>
+              )}
+              <button
+                type="submit"
+                form="checkout-form"
+                disabled={loading || shippingLoading || !selectedService || !form.courier_service}
+                className="w-full py-4 rounded-lg font-ui font-bold text-[18px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                style={{ backgroundColor: '#D2001A' }}
+              >
+                {loading ? 'Memproses...' : 'Buat Pesanan'}
+              </button>
+              {error && (
+                <p className="text-red-500 text-sm font-ui text-center">{error}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Order Button - Desktop (always visible at bottom) */}
+          <div className="hidden lg:block mt-8">
+            <div className="bg-white rounded-lg shadow-lg p-6 space-y-4 border-t-4" style={{ borderTopColor: '#D2001A' }}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-ui font-semibold text-gray-900 text-lg">Total Pesanan</p>
+                  <p className="text-sm font-ui text-gray-500 mt-1">
+                    {totalItems} produk • Ongkir: {formatPrice(form.ongkos_kirim || 0)}
+                  </p>
+                </div>
+                <span
+                  className="font-ui font-bold text-2xl"
+                  style={{ color: '#D2001A' }}
+                >
+                  {formatPrice(grandTotal)}
+                </span>
+              </div>
+              {!selectedService && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                  Hitung ongkir dan pilih layanan kurir terlebih dahulu untuk melanjutkan.
+                </div>
+              )}
+              <button
+                type="submit"
+                form="checkout-form"
+                disabled={loading || shippingLoading || !selectedService || !form.courier_service}
+                className="w-full py-4 rounded-lg font-ui font-bold text-[20px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                style={{ backgroundColor: '#D2001A' }}
+              >
+                {loading ? 'Memproses Pesanan...' : 'Buat Pesanan'}
+              </button>
+              {error && (
+                <p className="text-red-500 text-sm font-ui text-center">{error}</p>
+              )}
+            </div>
+          </div>
+          </>
         )}
       </div>
     </div>

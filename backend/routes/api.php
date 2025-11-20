@@ -1,9 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\BatchController;
-use App\Http\Controllers\BatchExtractController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\OrderController;
@@ -51,20 +50,25 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
+    Route::post('/products/{id}/add-stock', [ProductController::class, 'addStock']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
-    Route::post('/products/{productId}/batches', [BatchController::class, 'store']);
-    Route::get('/products/{productId}/batches', [BatchController::class, 'index']);
-    Route::put('/products/{productId}/batches/{id}', [BatchController::class, 'update']);
-
     Route::get('/admin/categories', [CategoryController::class, 'index']);
     Route::post('/admin/categories', [CategoryController::class, 'store']);
     Route::put('/admin/categories/{id}', [CategoryController::class, 'update']);
     Route::delete('/admin/categories/{id}', [CategoryController::class, 'destroy']);
 
+    // User Management
+    Route::get('/admin/users', [AdminUserController::class, 'index']);
+    Route::post('/admin/users', [AdminUserController::class, 'store']);
+    Route::get('/admin/users/{id}', [AdminUserController::class, 'show']);
+    Route::put('/admin/users/{id}', [AdminUserController::class, 'update']);
+    Route::delete('/admin/users/{id}', [AdminUserController::class, 'destroy']);
+
     Route::get('/admin/orders', [AdminOrderController::class, 'index']);
     Route::post('/admin/orders/manual', [AdminOrderController::class, 'storeManual']);
     Route::get('/admin/orders/{id}', [AdminOrderController::class, 'show']);
     Route::post('/admin/orders/{id}/verify-payment', [AdminOrderController::class, 'verifyPayment']);
+    Route::post('/admin/orders/{id}/product-codes', [AdminOrderController::class, 'updateProductCodes']);
     Route::post('/admin/orders/{id}/ship', [AdminOrderController::class, 'ship']);
     Route::post('/admin/orders/{id}/mark-delivered', [AdminOrderController::class, 'markDelivered']);
     Route::post('/admin/run-reservation-release', [AdminOrderController::class, 'runReservationRelease']);
@@ -75,13 +79,9 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::put('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'update']);
     Route::delete('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'destroy']);
 
-    Route::get('/reports/batch-stock', [ReportController::class, 'batchStock']);
-    Route::get('/reports/batch-sales', [ReportController::class, 'batchSales']);
     Route::get('/reports/summary', [ReportController::class, 'summary']);
     Route::get('/reports/sales-trend', [ReportController::class, 'salesTrend']);
     Route::get('/reports/product-sales', [ReportController::class, 'productSales']);
     Route::get('/reports/channel-performance', [ReportController::class, 'channelPerformance']);
     Route::get('/reports/export/product-sales', [ReportController::class, 'exportProductSales']);
-
-    Route::post('/extract-batch', [BatchExtractController::class, 'extract']);
 });

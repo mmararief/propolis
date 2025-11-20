@@ -76,15 +76,11 @@ class CheckoutController extends Controller
 
                 $order = Order::create([
                     'user_id' => $user->id,
-                    'customer_id' => $user->id,
                     'channel' => 'online',
                     'ordered_at' => now(),
                     'subtotal' => $pricing['subtotal'],
                     'ongkos_kirim' => $shippingCost,
                     'total' => $total,
-                    'gross_revenue' => $pricing['subtotal'],
-                    'net_revenue' => $total,
-                    'discount' => 0,
                     'courier' => $data['courier'] ?? null,
                     'courier_service' => $data['courier_service'] ?? null,
                     'destination_province_id' => $primaryAddress?->provinsi_id,
@@ -118,7 +114,7 @@ class CheckoutController extends Controller
 
                 $this->allocationService->reserveForOrder($order);
 
-                return $order->fresh(['items.batches.batch']);
+                return $order->fresh(['items.product', 'items.productCodes']);
             });
         } catch (InsufficientStockException $e) {
             return $this->fail($e->getMessage(), 422);

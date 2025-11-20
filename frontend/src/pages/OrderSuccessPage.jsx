@@ -137,7 +137,8 @@ const OrderSuccessPage = () => {
       setFile(null);
       fetchOrder();
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err.response?.data?.message || err.message || 'Gagal mengunggah bukti pembayaran';
+      setError(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -633,7 +634,6 @@ const OrderSuccessPage = () => {
                     <p className="font-ui font-medium text-gray-900 mb-1">
                       {item.product?.nama_produk ?? item.product_id}
                     </p>
-                    <p className="font-ui text-sm text-gray-500">Variasi: Botol</p>
                     <p className="font-ui text-sm text-gray-500">x {item.jumlah}</p>
                   </div>
                   <div className="text-right">
@@ -734,7 +734,7 @@ const OrderSuccessPage = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4">
-          {['belum_dibayar', 'menunggu_konfirmasi', 'expired'].includes(order.status) && (
+          {['belum_dibayar', 'menunggu_konfirmasi'].includes(order.status) && (
             <button
               onClick={cancelOrder}
               className="px-6 py-3 border-2 rounded-lg font-ui font-semibold text-[16px] transition-colors hover:bg-red-50"
@@ -763,8 +763,9 @@ const OrderSuccessPage = () => {
           </button>
         </div>
 
-        {/* Upload Proof Section (if not uploaded yet) */}
-        {!order.bukti_pembayaran_url && (
+        {/* Upload Proof Section (if not uploaded yet and order is still valid) */}
+        {!order.bukti_pembayaran_url && 
+         order.status === 'belum_dibayar' && (
           <div className="bg-white rounded-lg shadow-md p-6 mt-6">
             <h2 className="text-xl font-ui font-semibold mb-4 text-gray-900">
               Upload Bukti Pembayaran
@@ -773,11 +774,12 @@ const OrderSuccessPage = () => {
               <div>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.pdf"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0"
                   style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
                   required
+                  disabled={order.status === 'expired' || order.status === 'dibatalkan'}
                 />
               </div>
               {error && <p className="text-red-500 text-sm font-ui">{error}</p>}

@@ -122,9 +122,6 @@ const CartPage = () => {
                           <h3 className="font-ui font-medium text-gray-900 mb-1">
                             {item.product.nama_produk}
                           </h3>
-                          <p className="text-sm text-gray-500 font-ui">
-                            Varian: Botol
-                          </p>
                           {tiers.length > 0 && (
                             <div className="mt-2 text-xs text-slate-500 space-y-1">
                               {activeTier ? (

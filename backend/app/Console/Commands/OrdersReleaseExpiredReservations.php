@@ -20,7 +20,7 @@ class OrdersReleaseExpiredReservations extends Command
      *
      * @var string
      */
-    protected $description = 'Melepas reservasi batch untuk order yang sudah melewati batas waktu pembayaran (reservation_expires_at atau 1 jam dari waktu order dibuat).';
+    protected $description = 'Melepas reservasi stok untuk order yang sudah melewati batas waktu pembayaran (reservation_expires_at atau 1 jam dari waktu order dibuat).';
 
     public function __construct(private readonly BatchAllocationService $allocationService)
     {

@@ -13,9 +13,9 @@ const AboutPage = () => (
       <h1 className="text-2xl font-bold text-slate-900">Ekosistem Fulfillment Propolis</h1>
     </div>
     <p className="text-slate-600 leading-relaxed">
-      Kami membangun platform ini untuk membantu tim distribusi propolis memonitor stok per batch, memproses pesanan
-      pelanggan, dan mengotomasi perhitungan ongkir hingga laporan penjualan. Sistem ini siap diintegrasikan dengan aplikasi
-      produksi ataupun website e-commerce utama.
+      Kami membangun platform ini untuk membantu tim distribusi propolis memonitor stok produk secara real time, memproses
+      pesanan pelanggan, dan mengotomasi perhitungan ongkir hingga laporan penjualan. Sistem ini siap diintegrasikan dengan
+      aplikasi produksi ataupun website e-commerce utama.
     </p>
     <div>
       <h2 className="text-lg font-semibold text-slate-900 mb-2">Teknologi Utama</h2>

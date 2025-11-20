@@ -38,9 +38,6 @@ return [
         'origin_district_id' => env('RAJAONGKIR_ORIGIN_DISTRICT_ID'),
     ],
 
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY'),
-    ],
 
     'tracking' => [
         'binderbyte_api_key' => env('BINDERBYTE_API_KEY'),

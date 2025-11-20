@@ -137,6 +137,79 @@
                 ]
             }
         },
+        "/admin/orders/{id}/product-codes": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Input atau perbarui kode produk untuk setiap item order",
+                "operationId": "3dce2eeca290b3a891f1355ebfced529",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "items"
+                                ],
+                                "properties": {
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "order_item_id",
+                                                "kode_produk"
+                                            ],
+                                            "properties": {
+                                                "order_item_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "kode_produk": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "PROD-001"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Kode produk diperbarui"
+                    },
+                    "404": {
+                        "description": "Order tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi kode produk gagal atau order sudah dikirim"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/admin/orders/{id}/ship": {
             "post": {
                 "tags": [
@@ -236,6 +309,489 @@
                 ]
             }
         },
+        "/admin/users": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Daftar semua users",
+                "operationId": "9680ccebed17e49ff174b2a620cc0cd5",
+                "parameters": [
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "admin",
+                                "pelanggan"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar users"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Buat user baru",
+                "operationId": "6dd1e6388d8abe912442f06cee8ebb4c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_lengkap",
+                                    "username",
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "nama_lengkap": {
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "example": "johndoe"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "minLength": 8
+                                    },
+                                    "no_hp": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "admin",
+                                            "pelanggan"
+                                        ],
+                                        "example": "pelanggan"
+                                    },
+                                    "province_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "province_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "city_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "city_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "district_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "district_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "subdistrict_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "subdistrict_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "postal_code": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "alamat_lengkap": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User berhasil dibuat"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/admin/users/{id}": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Detail user",
+                "operationId": "96a5f01127fa460057178398a6ddb53b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detail user"
+                    },
+                    "404": {
+                        "description": "User tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update user",
+                "operationId": "2255216aa7a93450befbfb0dd7dde469",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "nama_lengkap": {
+                                        "type": "string"
+                                    },
+                                    "username": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "minLength": 8
+                                    },
+                                    "no_hp": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "admin",
+                                            "pelanggan"
+                                        ]
+                                    },
+                                    "province_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "province_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "city_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "city_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "district_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "district_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "subdistrict_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "subdistrict_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "postal_code": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "alamat_lengkap": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "User berhasil diupdate"
+                    },
+                    "404": {
+                        "description": "User tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Hapus user",
+                "operationId": "a42d951fbf6b2f8e25663e69c1b817d2",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User berhasil dihapus"
+                    },
+                    "404": {
+                        "description": "User tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "User tidak dapat dihapus karena memiliki pesanan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/admin/price-tiers": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Daftar harga tingkat global",
+                "operationId": "bd2d5d3793fc5ac1d7d1316fe90280a6",
+                "responses": {
+                    "200": {
+                        "description": "Daftar harga tingkat global"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Tambah harga tingkat global baru",
+                "operationId": "eb258e32afe4456bbefd93193dc9db72",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "min_jumlah",
+                                    "harga_total"
+                                ],
+                                "properties": {
+                                    "min_jumlah": {
+                                        "type": "integer"
+                                    },
+                                    "max_jumlah": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "harga_total": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Harga tingkat global berhasil ditambahkan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/admin/price-tiers/{id}": {
+            "put": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Perbarui harga tingkat global",
+                "operationId": "9fd84271f194d04a625ddb0db755a06f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "min_jumlah",
+                                    "harga_total"
+                                ],
+                                "properties": {
+                                    "min_jumlah": {
+                                        "type": "integer"
+                                    },
+                                    "max_jumlah": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "harga_total": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Harga tingkat global berhasil diperbarui"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Hapus harga tingkat global",
+                "operationId": "1966f3fc0657efc526440f46e6becf2b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Harga tingkat global berhasil dihapus"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/auth/register": {
             "post": {
                 "tags": [
@@ -289,8 +845,7 @@
                                     "role": {
                                         "type": "string",
                                         "enum": [
-                                            "pelanggan",
-                                            "reseller"
+                                            "pelanggan"
                                         ],
                                         "example": "pelanggan"
                                     },
@@ -484,26 +1039,16 @@
                 ]
             }
         },
-        "/products/{productId}/batches": {
+        "/cart": {
             "get": {
                 "tags": [
-                    "Batches"
+                    "Cart"
                 ],
-                "summary": "Daftar batch untuk produk",
-                "operationId": "3cdef7944210edf969612d50eda4b296",
-                "parameters": [
-                    {
-                        "name": "productId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Daftar item di keranjang",
+                "operationId": "294e093bf29c111c01d8402121fb4f43",
                 "responses": {
                     "200": {
-                        "description": "Daftar batch"
+                        "description": "Daftar item keranjang"
                     }
                 },
                 "security": [
@@ -514,45 +1059,28 @@
             },
             "post": {
                 "tags": [
-                    "Batches"
+                    "Cart"
                 ],
-                "summary": "Tambah batch baru / restock",
-                "operationId": "58315c63c52c24504a80010bd07218e0",
-                "parameters": [
-                    {
-                        "name": "productId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Tambah item ke keranjang",
+                "operationId": "17edc07162b12ee962c37746abcf34a5",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "batch_number",
-                                    "qty_initial"
+                                    "product_id",
+                                    "qty"
                                 ],
                                 "properties": {
-                                    "batch_number": {
-                                        "type": "string"
+                                    "product_id": {
+                                        "type": "integer",
+                                        "example": 1
                                     },
-                                    "qty_initial": {
-                                        "type": "integer"
-                                    },
-                                    "expiry_date": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "nullable": true
-                                    },
-                                    "purchase_price": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "nullable": true
+                                    "qty": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 2
                                     }
                                 },
                                 "type": "object"
@@ -561,8 +1089,28 @@
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "Batch berhasil ditambahkan"
+                    "200": {
+                        "description": "Item berhasil ditambahkan ke keranjang"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Kosongkan keranjang",
+                "operationId": "f377929d0e996a1c3f953864f92433ce",
+                "responses": {
+                    "200": {
+                        "description": "Keranjang berhasil dikosongkan"
                     }
                 },
                 "security": [
@@ -572,22 +1120,14 @@
                 ]
             }
         },
-        "/products/{productId}/batches/{id}": {
+        "/cart/{id}": {
             "put": {
                 "tags": [
-                    "Batches"
+                    "Cart"
                 ],
-                "summary": "Perbarui batch",
-                "operationId": "b6abe2f10d384d44cc15e12df007146b",
+                "summary": "Update jumlah item di keranjang",
+                "operationId": "cbc70cb27e37c57b77e0a05fac484f9e",
                 "parameters": [
-                    {
-                        "name": "productId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
                     {
                         "name": "id",
                         "in": "path",
@@ -602,16 +1142,14 @@
                     "content": {
                         "application/json": {
                             "schema": {
+                                "required": [
+                                    "qty"
+                                ],
                                 "properties": {
-                                    "expiry_date": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "nullable": true
-                                    },
-                                    "purchase_price": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "nullable": true
+                                    "qty": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 3
                                     }
                                 },
                                 "type": "object"
@@ -621,7 +1159,43 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Batch berhasil diperbarui"
+                        "description": "Item berhasil diupdate"
+                    },
+                    "404": {
+                        "description": "Item tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Hapus item dari keranjang",
+                "operationId": "3ed420e11c37f91b6708201df0a9f073",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Item berhasil dihapus"
+                    },
+                    "404": {
+                        "description": "Item tidak ditemukan"
                     }
                 },
                 "security": [
@@ -631,23 +1205,93 @@
                 ]
             }
         },
-        "/extract-batch": {
+        "/admin/categories": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Daftar semua kategori",
+                "operationId": "6072ee0d4f01268ba84981a78e569980",
+                "responses": {
+                    "200": {
+                        "description": "Daftar kategori"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
             "post": {
                 "tags": [
-                    "Batch"
+                    "Admin"
                 ],
-                "summary": "Extract nomor batch dan tanggal kadaluarsa dari gambar",
-                "operationId": "237e48d8a1860fdaba937a8cdf4c63c9",
+                "summary": "Buat kategori baru",
+                "operationId": "fd033ad238d9b6ffbb7a3552dfea158b",
                 "requestBody": {
                     "required": true,
                     "content": {
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
+                                "required": [
+                                    "nama_kategori"
+                                ],
                                 "properties": {
-                                    "file": {
-                                        "description": "Gambar kemasan produk",
+                                    "nama_kategori": {
                                         "type": "string",
-                                        "format": "binary"
+                                        "example": "Kategori Baru"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Kategori berhasil dibuat"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/admin/categories/{id}": {
+            "put": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update kategori",
+                "operationId": "78fd86c3f981b7d13128038646827438",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_kategori"
+                                ],
+                                "properties": {
+                                    "nama_kategori": {
+                                        "type": "string",
+                                        "example": "Kategori Updated"
                                     }
                                 },
                                 "type": "object"
@@ -657,39 +1301,46 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Data berhasil diekstrak",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "batch": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                },
-                                                "exp": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
+                        "description": "Kategori berhasil diupdate"
+                    },
+                    "404": {
+                        "description": "Kategori tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Hapus kategori",
+                "operationId": "1dda5aaba5a792b98fec7d365d7c72b0",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Kategori berhasil dihapus"
                     },
-                    "400": {
-                        "description": "File tidak valid"
+                    "404": {
+                        "description": "Kategori tidak ditemukan"
                     },
-                    "500": {
-                        "description": "Gagal memproses gambar"
+                    "422": {
+                        "description": "Kategori tidak dapat dihapus karena masih memiliki produk"
                     }
                 },
                 "security": [
@@ -1267,124 +1918,6 @@
                 ]
             }
         },
-        "/products/{productId}/price-tiers": {
-            "post": {
-                "tags": [
-                    "Products"
-                ],
-                "summary": "Tambahkan harga tingkat",
-                "operationId": "7d267b2b371593603b6b87770d35e6c2",
-                "parameters": [
-                    {
-                        "name": "productId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "min_jumlah",
-                                    "harga_total"
-                                ],
-                                "properties": {
-                                    "min_jumlah": {
-                                        "type": "integer"
-                                    },
-                                    "max_jumlah": {
-                                        "type": "integer",
-                                        "nullable": true
-                                    },
-                                    "harga_total": {
-                                        "type": "number",
-                                        "format": "float"
-                                    },
-                                    "label": {
-                                        "type": "string",
-                                        "nullable": true
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Harga tingkat ditambahkan"
-                    }
-                },
-                "security": [
-                    {
-                        "sanctum": []
-                    }
-                ]
-            }
-        },
-        "/reports/batch-stock": {
-            "get": {
-                "tags": [
-                    "Reports"
-                ],
-                "summary": "Laporan stok per batch",
-                "operationId": "de0ae838aa8832b64efb6edf8e06187d",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil memuat laporan"
-                    }
-                },
-                "security": [
-                    {
-                        "sanctum": []
-                    }
-                ]
-            }
-        },
-        "/reports/batch-sales": {
-            "get": {
-                "tags": [
-                    "Reports"
-                ],
-                "summary": "Laporan penjualan per batch",
-                "operationId": "622d41b36b8c0d52a26b086cf34de87c",
-                "parameters": [
-                    {
-                        "name": "from",
-                        "in": "query",
-                        "description": "Tanggal awal (Y-m-d)",
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    },
-                    {
-                        "name": "to",
-                        "in": "query",
-                        "description": "Tanggal akhir (Y-m-d)",
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil memuat laporan"
-                    }
-                },
-                "security": [
-                    {
-                        "sanctum": []
-                    }
-                ]
-            }
-        },
         "/shipping/provinces": {
             "get": {
                 "tags": [
@@ -1653,16 +2186,8 @@
             "description": "Registrasi, login, logout."
         },
         {
-            "name": "Batches",
-            "description": "Batches"
-        },
-        {
-            "name": "Batch",
-            "description": "Batch"
-        },
-        {
-            "name": "Reports",
-            "description": "Reports"
+            "name": "Cart",
+            "description": "Cart"
         }
     ],
     "security": [

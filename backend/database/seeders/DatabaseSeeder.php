@@ -2,14 +2,14 @@
 
 namespace Database\Seeders;
 
-use App\Models\BatchStockMovement;
 use App\Models\Category;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\OrderItemProductCode;
 use App\Models\PriceTier;
 use App\Models\Product;
-use App\Models\ProductBatch;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -73,26 +73,13 @@ class DatabaseSeeder extends Seeder
         );
 
         foreach ($products as $product) {
-            $batch = ProductBatch::create([
-                'product_id' => $product->id,
-                'batch_number' => 'BATCH-' . $product->id . '-' . now()->format('Ym'),
-                'qty_initial' => 100,
-                'qty_remaining' => 100,
-                'expiry_date' => now()->addMonths(6),
-                'purchase_price' => $product->harga_ecer * 0.6,
-            ]);
-
-            BatchStockMovement::create([
-                'batch_id' => $batch->id,
-                'change_qty' => 100,
-                'reason' => 'restock',
-                'reference_table' => 'seeders',
-                'reference_id' => $batch->id,
-                'note' => 'Seed data restock',
-            ]);
-
-            $product->refreshStockCache();
+            $product->forceFill([
+                'stok' => 100,
+                'stok_reserved' => 0,
+            ])->save();
         }
+
+        $this->seedDemoOrderWithProductCodes($admin, $products);
 
         // Cache::put('rajaongkir:provinces', [
         //     ['province_id' => 1, 'province' => 'NUSA TENGGARA BARAT (NTB)'],
@@ -131,5 +118,74 @@ class DatabaseSeeder extends Seeder
         //     ['province_id' => 34, 'province' => 'SULAWESI SELATAN'],
         //     ['province_id' => 35, 'province' => 'SULAWESI BARAT'],
         // ], now()->addDay());
+    }
+    private function seedDemoOrderWithProductCodes(User $admin, $products): void
+    {
+        if ($products->isEmpty()) {
+            return;
+        }
+
+        $demoItems = $products->take(2)->map(function ($product, $index) {
+            $quantity = $index + 1; // 1 unit for first product, 2 for second
+            $price = $product->harga_ecer;
+
+            return [
+                'product_id' => $product->id,
+                'product_sku' => $product->sku,
+                'jumlah' => $quantity,
+                'harga_satuan' => $price,
+                'total' => $price * $quantity,
+            ];
+        });
+
+        $subtotal = $demoItems->sum('total');
+        $shipping = 20000;
+        $externalOrderId = 'DEMO-ORDER-1';
+
+        /** @var Order $order */
+        $order = Order::updateOrCreate(
+            ['external_order_id' => $externalOrderId],
+            [
+                'user_id' => $admin->id,
+                'customer_name' => $admin->nama_lengkap,
+                'customer_email' => $admin->email,
+                'phone' => $admin->no_hp,
+                'address' => $admin->alamat_lengkap,
+                'subtotal' => $subtotal,
+                'ongkos_kirim' => $shipping,
+                'total' => $subtotal + $shipping,
+                'channel' => 'online',
+                'status' => 'diproses',
+                'metode_pembayaran' => 'BCA',
+                'ordered_at' => now()->subDay(),
+            ]
+        );
+
+        foreach ($demoItems as $itemData) {
+            /** @var OrderItem $orderItem */
+            $orderItem = OrderItem::updateOrCreate(
+                [
+                    'order_id' => $order->id,
+                    'product_id' => $itemData['product_id'],
+                ],
+                [
+                    'harga_satuan' => $itemData['harga_satuan'],
+                    'jumlah' => $itemData['jumlah'],
+                    'total_harga' => $itemData['total'],
+                    'catatan' => 'Sample order item for seeding',
+                    'harga_tingkat_id' => null,
+                ]
+            );
+
+            OrderItemProductCode::where('order_item_id', $orderItem->id)->delete();
+
+            for ($i = 1; $i <= $itemData['jumlah']; $i++) {
+                OrderItemProductCode::create([
+                    'order_item_id' => $orderItem->id,
+                    'kode_produk' => sprintf('%s-%s-%02d', $externalOrderId, $itemData['product_sku'], $i),
+                    'sequence' => $i,
+                ]);
+            }
+        }
     }
 }

@@ -15,13 +15,17 @@ const UploadProofPage = () => {
     formData.append('bukti', file);
     setLoading(true);
     setError(null);
+    setMessage(null);
     try {
       await api.post(`/orders/${orderId}/upload-proof`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setMessage('Bukti berhasil diunggah');
+      setFile(null);
+      setOrderId('');
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err.response?.data?.message || err.message || 'Gagal mengunggah bukti pembayaran';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

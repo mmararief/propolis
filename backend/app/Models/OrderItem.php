@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrderItem extends Model
 {
@@ -26,6 +27,10 @@ class OrderItem extends Model
         'allocated' => 'boolean',
     ];
 
+    protected $appends = [
+        'batches',
+    ];
+
     public function order()
     {
         return $this->belongsTo(Order::class);
@@ -41,8 +46,13 @@ class OrderItem extends Model
         return $this->belongsTo(PriceTier::class, 'harga_tingkat_id');
     }
 
-    public function batches()
+    public function productCodes(): HasMany
     {
-        return $this->hasMany(OrderItemBatch::class);
+        return $this->hasMany(OrderItemProductCode::class)->orderBy('sequence');
+    }
+
+    public function getBatchesAttribute(): array
+    {
+        return [];
     }
 }

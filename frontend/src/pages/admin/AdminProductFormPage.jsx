@@ -8,6 +8,7 @@ const initialForm = {
   sku: '',
   nama_produk: '',
   harga_ecer: '',
+  stok: '0',
   status: 'aktif',
   deskripsi: '',
   berat: '500',
@@ -25,8 +26,9 @@ const AdminProductFormPage = () => {
   const [fetching, setFetching] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [existingImage, setExistingImage] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
+  const [imagesToDelete, setImagesToDelete] = useState([]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -47,12 +49,17 @@ const AdminProductFormPage = () => {
         sku: product.sku || '',
         nama_produk: product.nama_produk || '',
         harga_ecer: product.harga_ecer || '',
+        stok: product.stok?.toString() || '0',
         status: product.status || 'aktif',
         deskripsi: product.deskripsi || '',
         berat: product.berat?.toString() || '500',
-        gambar_file: null,
       });
-      setExistingImage(product.gambar ? getProductImageUrl(product.gambar) : null);
+      const productImages = Array.isArray(product.gambar) 
+        ? product.gambar 
+        : (product.gambar ? [product.gambar] : []);
+      setExistingImages(productImages.map(img => getProductImageUrl(img)));
+      setImageFiles([]);
+      setImagesToDelete([]);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Gagal memuat produk');
     } finally {
@@ -68,17 +75,21 @@ const AdminProductFormPage = () => {
   }, [fetchCategories, fetchProduct, isEdit]);
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setForm({ ...form, gambar_file: file });
-      setExistingImage(null);
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setImageFiles((prev) => [...prev, ...files]);
     }
+    // Reset input
+    e.target.value = '';
+  };
+
+  const removeImageFile = (index) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (imageUrl) => {
+    setExistingImages((prev) => prev.filter((img) => img !== imageUrl));
+    setImagesToDelete((prev) => [...prev, imageUrl]);
   };
 
   const handleSubmit = async (e) => {
@@ -93,6 +104,7 @@ const AdminProductFormPage = () => {
       formData.append('sku', form.sku);
       formData.append('nama_produk', form.nama_produk);
       formData.append('harga_ecer', form.harga_ecer);
+      formData.append('stok', form.stok || '0');
       formData.append('status', form.status);
       if (form.deskripsi) {
         formData.append('deskripsi', form.deskripsi);
@@ -100,9 +112,25 @@ const AdminProductFormPage = () => {
       if (form.berat) {
         formData.append('berat', form.berat);
       }
-      if (form.gambar_file) {
-        formData.append('gambar_file', form.gambar_file);
+      
+      // Append existing images (those not marked for deletion)
+      if (existingImages.length > 0) {
+        existingImages.forEach((img) => {
+          if (!imagesToDelete.includes(img)) {
+            formData.append('gambar[]', img);
+          }
+        });
       }
+      
+      // Append new image files
+      imageFiles.forEach((file) => {
+        formData.append('gambar_file[]', file);
+      });
+      
+      // Append images to delete
+      imagesToDelete.forEach((img) => {
+        formData.append('gambar_hapus[]', img);
+      });
 
       if (isEdit) {
         await api.put(`/products/${id}`, formData, {
@@ -231,6 +259,22 @@ const AdminProductFormPage = () => {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
+                Stok <span className="text-red-500">*</span>
+              </label>
+              <input
+                className="input-field w-full"
+                type="number"
+                value={form.stok}
+                onChange={(e) => setForm({ ...form, stok: e.target.value })}
+                placeholder="0"
+                min="0"
+                required
+              />
+              <p className="text-xs text-slate-500 mt-1">Jumlah stok awal produk</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 Status <span className="text-red-500">*</span>
               </label>
               <select
@@ -274,25 +318,69 @@ const AdminProductFormPage = () => {
 
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Gambar Produk
+                Gambar Produk (Bisa upload lebih dari 1 gambar)
               </label>
               <input
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp"
                 className="input-field w-full"
                 onChange={handleImageChange}
+                multiple
               />
-              {(imagePreview || existingImage) && (
-                <div className="mt-3">
-                  <p className="text-xs text-slate-500 mb-2">Preview:</p>
-                  <img
-                    src={imagePreview || existingImage}
-                    alt="Preview"
-                    className="w-32 h-32 object-cover rounded-lg border border-slate-200"
-                  />
-                  {existingImage && !imagePreview && (
-                    <p className="text-xs text-slate-500 mt-1">Gambar saat ini</p>
-                  )}
+              <p className="text-xs text-slate-500 mt-1">
+                Pilih satu atau lebih gambar. Format: JPG, PNG, atau WebP (max 2MB per gambar)
+              </p>
+              
+              {/* Existing Images */}
+              {existingImages.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-slate-700 mb-2">Gambar Saat Ini:</p>
+                  <div className="flex flex-wrap gap-3">
+                    {existingImages.map((img, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={img}
+                          alt={`Gambar ${idx + 1}`}
+                          className="w-24 h-24 object-cover rounded-lg border border-slate-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(img)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* New Image Previews */}
+              {imageFiles.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-slate-700 mb-2">Gambar Baru:</p>
+                  <div className="flex flex-wrap gap-3">
+                    {imageFiles.map((file, idx) => {
+                      const preview = URL.createObjectURL(file);
+                      return (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={preview}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-24 h-24 object-cover rounded-lg border border-slate-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImageFile(idx)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

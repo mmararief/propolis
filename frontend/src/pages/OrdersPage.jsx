@@ -233,7 +233,7 @@ const OrdersPage = () => {
                         >
                           Hubungi Admin
                         </button>
-                        {['belum_dibayar', 'menunggu_konfirmasi', 'expired'].includes(order.status) && (
+                        {['belum_dibayar', 'menunggu_konfirmasi'].includes(order.status) && (
                           <button
                             onClick={() => cancelOrder(order.id)}
                             className="px-6 py-2 border-2 rounded-lg font-ui font-semibold text-[14px] transition-colors hover:bg-red-50"

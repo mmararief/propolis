@@ -17,6 +17,7 @@ class Product extends Model
         'deskripsi',
         'harga_ecer',
         'stok',
+        'stok_reserved',
         'gambar',
         'berat',
         'status',
@@ -24,16 +25,17 @@ class Product extends Model
 
     protected $casts = [
         'harga_ecer' => 'decimal:2',
+        'gambar' => 'array',
+    ];
+
+    protected $appends = [
+        'stok_available',
+        'batches',
     ];
 
     public function category()
     {
         return $this->belongsTo(Category::class, 'kategori_id');
-    }
-
-    public function batches()
-    {
-        return $this->hasMany(ProductBatch::class);
     }
 
     /**
@@ -60,9 +62,33 @@ class Product extends Model
         return $query->where('status', 'aktif');
     }
 
+    public function getStokAvailableAttribute(): int
+    {
+        $stok = (int) ($this->attributes['stok'] ?? 0);
+        $reserved = (int) ($this->attributes['stok_reserved'] ?? 0);
+
+        return max(0, $stok - $reserved);
+    }
+
     public function refreshStockCache(): void
     {
-        $total = $this->batches()->sum('qty_remaining');
-        $this->forceFill(['stok' => $total])->save();
+        $this->forceFill([
+            'stok' => max(0, (int) $this->stok),
+            'stok_reserved' => max(0, (int) $this->stok_reserved),
+        ])->save();
+    }
+
+    public function getBatchesAttribute(): array
+    {
+        return [[
+            'id' => $this->id,
+            'product_id' => $this->id,
+            'batch_number' => $this->sku,
+            'qty_initial' => (int) $this->stok,
+            'qty_remaining' => $this->stok_available,
+            'reserved_qty' => (int) $this->stok_reserved,
+            'expiry_date' => null,
+            'purchase_price' => null,
+        ]];
     }
 }

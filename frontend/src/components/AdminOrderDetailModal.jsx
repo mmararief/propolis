@@ -17,6 +17,10 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [codeInputs, setCodeInputs] = useState({});
+  const [codeError, setCodeError] = useState(null);
+  const [codeMessage, setCodeMessage] = useState(null);
+  const [isSavingCodes, setIsSavingCodes] = useState(false);
 
   const fetchOrderDetail = useCallback(async () => {
     setLoading(true);
@@ -37,6 +41,20 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
     }
   }, [fetchOrderDetail, isOpen, orderId]);
 
+  useEffect(() => {
+    if (!order) return;
+
+    const initialCodes = {};
+    order.items?.forEach((item) => {
+      const existingCodes = item.product_codes || [];
+      const normalized = Array.from({ length: item.jumlah || 0 }).map((_, idx) => existingCodes[idx]?.kode_produk || '');
+      initialCodes[item.id] = normalized;
+    });
+    setCodeInputs(initialCodes);
+    setCodeError(null);
+    setCodeMessage(null);
+  }, [order]);
+
   const handleMarkDelivered = async () => {
     if (!orderId || !order) return;
     if (!window.confirm('Tandai pesanan ini selesai?')) return;
@@ -52,6 +70,76 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
       setActionLoading(false);
     }
   };
+
+  const handleCodeInputChange = (itemId, index, value) => {
+    setCodeInputs((prev) => {
+      const next = { ...prev };
+      const current = Array.from(next[itemId] || []);
+      current[index] = value;
+      next[itemId] = current;
+      return next;
+    });
+  };
+
+  const handleSaveCodes = async () => {
+    if (!orderId || !order || order.status !== 'diproses') return;
+
+    setCodeError(null);
+    setCodeMessage(null);
+
+    const payloadItems = [];
+    const allCodes = [];
+
+    for (const item of order.items || []) {
+      const codes = Array.from(codeInputs[item.id] || []).map((code) => code.trim());
+
+      if (codes.length !== item.jumlah) {
+        setCodeError(`Lengkapi ${item.jumlah} kode untuk ${item.product?.nama_produk || 'produk'}`);
+        return;
+      }
+
+      if (codes.some((code) => !code)) {
+        setCodeError('Semua kode produk harus terisi tanpa spasi kosong');
+        return;
+      }
+
+      payloadItems.push({
+        order_item_id: item.id,
+        kode_produk: codes,
+      });
+      allCodes.push(...codes);
+    }
+
+    if (allCodes.length === 0) {
+      setCodeError('Isi minimal satu kode produk sebelum menyimpan');
+      return;
+    }
+
+    const seen = new Set();
+    for (const code of allCodes) {
+      if (seen.has(code)) {
+        setCodeError('Kode produk tidak boleh duplikat dalam satu pesanan');
+        return;
+      }
+      seen.add(code);
+    }
+
+    setIsSavingCodes(true);
+    try {
+      await api.post(`/admin/orders/${orderId}/product-codes`, {
+        items: payloadItems,
+      });
+      setCodeMessage('Kode produk berhasil disimpan');
+      await fetchOrderDetail();
+      onStatusUpdated?.();
+    } catch (err) {
+      setCodeError(err.response?.data?.message || err.message || 'Gagal menyimpan kode produk');
+    } finally {
+      setIsSavingCodes(false);
+    }
+  };
+
+  const canEditCodes = order?.status === 'diproses';
 
   if (!isOpen) return null;
 
@@ -88,6 +176,18 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
           {actionError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-red-600">{actionError}</p>
+            </div>
+          )}
+
+          {order?.status === 'diproses' && codeError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-600">{codeError}</p>
+            </div>
+          )}
+
+          {order?.status === 'diproses' && codeMessage && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-green-700">{codeMessage}</p>
             </div>
           )}
 
@@ -187,10 +287,10 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                 </div>
               </div>
 
-              {/* Order Items with Batch Info */}
+              {/* Order Items */}
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                  Daftar Produk & Batch
+                  Daftar Produk & Kode
                 </h3>
                 <div className="space-y-4">
                   {order.items?.map((item) => (
@@ -209,70 +309,49 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                             {Number(item.total_harga).toLocaleString('id-ID')}
                           </p>
                         </div>
-                        <div className="text-right">
-                          {item.allocated ? (
-                            <span className="badge-status bg-green-100 text-green-700">
-                              Dialokasikan
-                            </span>
-                          ) : (
-                            <span className="badge-status bg-yellow-100 text-yellow-700">
-                              Belum Dialokasikan
-                            </span>
-                          )}
-                        </div>
                       </div>
 
-                      {/* Batch Information */}
-                      {item.batches && item.batches.length > 0 ? (
-                        <div className="mt-3 pt-3 border-t border-slate-200 bg-blue-50 rounded-lg p-3">
-                          <p className="text-sm font-semibold text-blue-900 mb-2">
-                            📦 Batch yang Harus Dikirim:
-                          </p>
-                          <div className="space-y-2">
-                            {item.batches.map((allocation, idx) => (
-                              <div
-                                key={idx}
-                                className="bg-white border border-blue-200 rounded-lg p-3"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <p className="font-bold text-slate-900 text-base">
-                                      Batch: <span className="text-blue-600">{allocation.batch?.batch_number || 'N/A'}</span>
-                                    </p>
-                                    <div className="mt-1 space-y-1">
-                                      <p className="text-sm text-slate-700">
-                                        <span className="font-medium">Jumlah:</span> {allocation.qty} unit
-                                      </p>
-                                      {allocation.batch?.expiry_date && (
-                                        <p className="text-sm text-slate-700">
-                                          <span className="font-medium">Tanggal Kadaluarsa:</span>{' '}
-                                          {new Date(allocation.batch.expiry_date).toLocaleDateString('id-ID', {
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric'
-                                          })}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <p className="text-xs text-blue-700 mt-2 italic">
-                            ⚠️ Pastikan produk dengan nomor batch di atas yang dikirim!
-                          </p>
+                      <div className="mt-4 pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-semibold text-slate-900">Kode Produk</p>
+                          <span className="text-xs text-slate-500">
+                            {canEditCodes ? 'Wajib diisi sebelum kirim' : 'Tidak dapat diubah pada status ini'}
+                          </span>
                         </div>
-                      ) : (
-                        <div className="mt-3 pt-3 border-t border-slate-200 bg-amber-50 rounded-lg p-3">
-                          <p className="text-sm font-medium text-amber-800">
-                            ⚠️ Batch belum dialokasikan. Verifikasi pembayaran terlebih dahulu untuk melihat informasi batch.
-                          </p>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          {Array.from({ length: item.jumlah }).map((_, idx) => (
+                            <input
+                              key={`${item.id}-code-${idx}`}
+                              type="text"
+                              value={codeInputs[item.id]?.[idx] ?? ''}
+                              onChange={(e) => handleCodeInputChange(item.id, idx, e.target.value)}
+                              disabled={!canEditCodes}
+                              className="input-field font-mono text-sm"
+                              placeholder={`Kode produk #${idx + 1}`}
+                            />
+                          ))}
                         </div>
-                      )}
+                        {item.product_codes?.length > 0 && !canEditCodes && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Kode tersimpan: {item.product_codes.map((code) => code.kode_produk).join(', ')}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
+                {canEditCodes && order.items?.length > 0 && (
+                  <div className="flex justify-end mt-4">
+                    <button
+                      type="button"
+                      className="btn-primary disabled:opacity-50"
+                      onClick={handleSaveCodes}
+                      disabled={isSavingCodes}
+                    >
+                      {isSavingCodes ? 'Menyimpan...' : 'Simpan Semua Kode Produk'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Shipping Address */}

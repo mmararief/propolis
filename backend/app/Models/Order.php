@@ -12,7 +12,6 @@ class Order extends Model
 
     protected $fillable = [
         'user_id',
-        'customer_id',
         'customer_name',
         'customer_email',
         'subtotal',
@@ -43,9 +42,6 @@ class Order extends Model
         'tracking_completed_at',
         'reservation_expires_at',
         'ordered_at',
-        'gross_revenue',
-        'net_revenue',
-        'discount',
     ];
 
     protected $appends = [
@@ -58,9 +54,6 @@ class Order extends Model
         'total' => 'decimal:2',
         'reservation_expires_at' => 'datetime',
         'ordered_at' => 'datetime',
-        'gross_revenue' => 'decimal:2',
-        'net_revenue' => 'decimal:2',
-        'discount' => 'decimal:2',
         'tracking_payload' => 'array',
         'tracking_last_checked_at' => 'datetime',
         'tracking_completed_at' => 'datetime',

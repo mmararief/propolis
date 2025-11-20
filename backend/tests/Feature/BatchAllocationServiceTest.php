@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Console\Commands\OrdersReleaseExpiredReservations;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\ProductBatch;
 use App\Models\User;
 use App\Services\BatchAllocationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,47 +27,38 @@ class BatchAllocationServiceTest extends TestCase
 
     public function test_reserve_for_order_sets_reserved_qty_and_expiration(): void
     {
-        $order = $this->prepareOrderWithBatches(4, [3, 3]);
+        $order = $this->prepareOrderWithStock(4, 10);
 
         $this->service->reserveForOrder($order, 30);
 
-        $order->refresh();
-        $this->assertNotNull($order->reservation_expires_at);
+        $order->refresh()->load('items.product');
+        $product = $order->items->first()->product->fresh();
 
-        $batches = ProductBatch::orderBy('expiry_date')->get();
-        $this->assertEquals(3, $batches[0]->reserved_qty);
-        $this->assertEquals(1, $batches[1]->reserved_qty);
+        $this->assertNotNull($order->reservation_expires_at);
+        $this->assertEquals(4, $product->stok_reserved);
+        $this->assertEquals(6, $product->stok_available);
     }
 
-    public function test_allocate_handles_multi_batch_distribution(): void
+    public function test_allocate_reduces_stock_and_marks_items_allocated(): void
     {
-        $order = $this->prepareOrderWithBatches(4, [3, 2]);
+        $order = $this->prepareOrderWithStock(3, 5);
 
         $this->service->reserveForOrder($order);
         $this->service->allocate($order->id);
 
-        $order->refresh();
-        $this->assertEquals('belum_dibayar', $order->status);
-        $this->assertNull($order->reservation_expires_at);
+        $order->refresh()->load('items.product');
+        $product = $order->items->first()->product->fresh();
+        $item = $order->items->first();
 
-        $item = $order->items()->with('batches')->first();
         $this->assertTrue($item->allocated);
-        $this->assertCount(2, $item->batches);
-
-        $batchOne = $item->batches->firstWhere('qty', 3);
-        $batchTwo = $item->batches->firstWhere('qty', 1);
-
-        $this->assertNotNull($batchOne);
-        $this->assertNotNull($batchTwo);
-
-        $remaining = ProductBatch::orderBy('created_at')->get();
-        $this->assertEquals(0, $remaining[0]->qty_remaining);
-        $this->assertEquals(1, $remaining[1]->qty_remaining);
+        $this->assertEquals(2, $product->stok);
+        $this->assertEquals(0, $product->stok_reserved);
+        $this->assertNull($order->reservation_expires_at);
     }
 
     public function test_release_expired_reservations_returns_stock(): void
     {
-        $order = $this->prepareOrderWithBatches(2, [2]);
+        $order = $this->prepareOrderWithStock(2, 5);
         $this->service->reserveForOrder($order);
 
         $order->update([
@@ -79,37 +68,27 @@ class BatchAllocationServiceTest extends TestCase
 
         $this->artisan('orders:release-expired-reservations');
 
-        $order->refresh();
+        $order->refresh()->load('items.product');
+        $product = $order->items->first()->product->fresh();
 
         $this->assertEquals('expired', $order->status);
-        $this->assertEquals(0, ProductBatch::first()->reserved_qty);
-        $this->assertDatabaseCount('order_item_batches', 0);
+        $this->assertEquals(0, $product->stok_reserved);
     }
 
-    private function prepareOrderWithBatches(int $itemQty, array $batches): Order
+    private function prepareOrderWithStock(int $itemQty, int $stock): Order
     {
         $user = User::factory()->create();
         $category = Category::firstOrCreate(['nama_kategori' => 'Test']);
         $product = Product::create([
             'kategori_id' => $category->id,
-            'sku' => Str::uuid(),
+            'sku' => (string) Str::uuid(),
             'nama_produk' => 'Produk Test',
             'deskripsi' => 'Digunakan untuk pengujian.',
             'harga_ecer' => 50000,
-            'stok' => 0,
+            'stok' => $stock,
+            'stok_reserved' => 0,
             'status' => 'aktif',
         ]);
-
-        foreach ($batches as $index => $qty) {
-            ProductBatch::create([
-                'product_id' => $product->id,
-                'batch_number' => 'BATCH-' . ($index + 1),
-                'qty_initial' => $qty,
-                'qty_remaining' => $qty,
-                'expiry_date' => now()->addDays(($index + 1) * 30),
-                'reserved_qty' => 0,
-            ]);
-        }
 
         $order = Order::create([
             'user_id' => $user->id,

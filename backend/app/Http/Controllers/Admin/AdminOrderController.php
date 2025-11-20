@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ReleaseExpiredReservationJob;
 use App\Jobs\SendOrderShippedNotificationJob;
 use App\Models\Order;
+use App\Models\OrderItemProductCode;
+use App\Models\PriceTier;
 use App\Services\BatchAllocationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -93,9 +95,8 @@ class AdminOrderController extends Controller
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
-            'items.*.batches' => ['nullable', 'array'],
-            'items.*.batches.*.batch_id' => ['required_with:items.*.batches', 'exists:product_batches,id'],
-            'items.*.batches.*.qty' => ['required_with:items.*.batches', 'integer', 'min:1'],
+            'items.*.kode_produk' => ['nullable', 'array'],
+            'items.*.kode_produk.*' => ['nullable', 'string', 'max:100'],
         ], [], [
             'customer.name' => 'nama customer',
             'customer.phone' => 'telepon customer',
@@ -107,18 +108,31 @@ class AdminOrderController extends Controller
                 'product_id' => (int) $item['product_id'],
                 'qty' => (int) $item['qty'],
                 'price' => (float) $item['price'],
-                'batches' => collect($item['batches'] ?? [])
-                    ->map(function ($batch) {
-                        return [
-                            'batch_id' => (int) ($batch['batch_id'] ?? 0),
-                            'qty' => (int) ($batch['qty'] ?? 0),
-                        ];
-                    })
-                    ->filter(fn($batch) => $batch['batch_id'] > 0 && $batch['qty'] > 0)
+                'codes' => collect($item['kode_produk'] ?? [])
+                    ->map(fn($code) => trim((string) $code))
+                    ->filter()
                     ->values()
                     ->all(),
             ];
         });
+
+        $items->each(function ($item, $index) {
+            if (! empty($item['codes']) && count($item['codes']) !== $item['qty']) {
+                throw new \InvalidArgumentException("Jumlah kode produk pada item ke-" . ($index + 1) . " harus sama dengan qty");
+            }
+        });
+
+        $allCodes = $items->flatMap(fn($item) => $item['codes'])->filter()->values();
+        if ($allCodes->count() !== $allCodes->unique()->count()) {
+            throw new \InvalidArgumentException('Kode produk tidak boleh duplikat dalam satu permintaan');
+        }
+
+        if ($allCodes->isNotEmpty()) {
+            $conflictCount = OrderItemProductCode::whereIn('kode_produk', $allCodes)->count();
+            if ($conflictCount > 0) {
+                throw new \InvalidArgumentException('Beberapa kode produk sudah digunakan pada pesanan lain');
+            }
+        }
 
         $subtotal = $items->reduce(fn($sum, $item) => $sum + ($item['qty'] * $item['price']), 0);
         $shippingCost = (float) ($data['shipping_cost'] ?? 0);
@@ -135,7 +149,6 @@ class AdminOrderController extends Controller
                 /** @var Order $order */
                 $order = Order::create([
                     'user_id' => $data['user_id'] ?? null,
-                    'customer_id' => $data['user_id'] ?? null,
                     'customer_name' => $data['customer']['name'] ?? null,
                     'customer_email' => $data['customer']['email'] ?? null,
                     'phone' => $data['customer']['phone'] ?? null,
@@ -152,9 +165,6 @@ class AdminOrderController extends Controller
                     'subtotal' => $subtotal,
                     'ongkos_kirim' => $shippingCost,
                     'total' => $total,
-                    'gross_revenue' => $subtotal,
-                    'net_revenue' => $total,
-                    'discount' => 0,
                     'channel' => $channel,
                     'external_order_id' => $data['external_order_id'] ?? null,
                     'status' => $status,
@@ -165,16 +175,19 @@ class AdminOrderController extends Controller
                 ]);
 
                 foreach ($items as $item) {
+                    // Tentukan harga tingkat berdasarkan jumlah (qty)
+                    $hargaTingkatId = $this->determinePriceTier($item['product_id'], $item['qty']);
+
                     $orderItem = $order->items()->create([
                         'product_id' => $item['product_id'],
                         'jumlah' => $item['qty'],
                         'harga_satuan' => $item['price'],
                         'total_harga' => $item['price'] * $item['qty'],
-                        'harga_tingkat_id' => null,
+                        'harga_tingkat_id' => $hargaTingkatId,
                     ]);
 
-                    if (! empty($item['batches'])) {
-                        $this->allocationService->allocateSpecificBatches($orderItem, $item['batches'], true);
+                    if (! empty($item['codes'])) {
+                        $this->syncItemProductCodes($orderItem, $item['codes']);
                     }
                 }
 
@@ -182,7 +195,7 @@ class AdminOrderController extends Controller
                     $this->allocationService->allocate($order->id);
                 }
 
-                return $order->fresh(['items.product', 'items.batches.batch', 'user']);
+                return $order->fresh(['items.product', 'items.productCodes', 'user']);
             });
         } catch (InsufficientStockException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -208,7 +221,7 @@ class AdminOrderController extends Controller
     {
         $this->authorize('admin');
 
-        $order = Order::with(['user', 'items.product', 'items.batches.batch'])->findOrFail($id);
+        $order = Order::with(['user', 'items.product', 'items.productCodes'])->findOrFail($id);
 
         return $this->success($order);
     }
@@ -240,7 +253,118 @@ class AdminOrderController extends Controller
             $order->save();
         });
 
-        return $this->success($order->fresh(['items.batches.batch']), 'Order verified and allocated');
+        return $this->success($order->fresh(['items.product', 'items.productCodes']), 'Order verified and allocated');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/admin/orders/{id}/product-codes",
+     *     tags={"Admin"},
+     *     summary="Input atau perbarui kode produk untuk setiap item order",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"items"},
+     *             @OA\Property(
+     *                 property="items",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     required={"order_item_id","kode_produk"},
+     *                     @OA\Property(property="order_item_id", type="integer", example=1),
+     *                     @OA\Property(
+     *                         property="kode_produk",
+     *                         type="array",
+     *                         @OA\Items(type="string", example="PROD-001")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Kode produk diperbarui"),
+     *     @OA\Response(response=404, description="Order tidak ditemukan"),
+     *     @OA\Response(response=422, description="Validasi kode produk gagal atau order sudah dikirim")
+     * )
+     */
+    public function updateProductCodes(Request $request, int $orderId)
+    {
+        $this->authorize('admin');
+
+        /** @var Order $order */
+        $order = Order::with('items')->findOrFail($orderId);
+
+        if ($order->status === 'dikirim' || $order->status === 'selesai') {
+            return $this->fail('Kode produk tidak dapat diubah setelah order dikirim', 422);
+        }
+
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.order_item_id' => ['required', 'integer'],
+            'items.*.kode_produk' => ['required', 'array', 'min:1'],
+            'items.*.kode_produk.*' => ['required', 'string', 'max:100'],
+        ]);
+
+        $orderItems = $order->items->keyBy('id');
+        $payloadItemIds = collect($data['items'])->pluck('order_item_id')->all();
+
+        foreach ($payloadItemIds as $itemId) {
+            if (! $orderItems->has($itemId)) {
+                return $this->fail('Item pesanan tidak valid untuk order ini', 422);
+            }
+        }
+
+        $formattedItems = collect($data['items'])->map(function ($item) {
+            $codes = collect($item['kode_produk'])
+                ->map(fn($code) => trim((string) $code))
+                ->filter()
+                ->values();
+
+            return [
+                'order_item_id' => (int) $item['order_item_id'],
+                'kode_produk' => $codes->all(),
+            ];
+        });
+
+        $allCodes = $formattedItems->flatMap(fn($item) => $item['kode_produk'])->values();
+
+        if ($allCodes->isEmpty()) {
+            return $this->fail('Kode produk wajib diisi', 422);
+        }
+
+        if ($allCodes->count() !== $allCodes->unique()->count()) {
+            return $this->fail('Kode produk tidak boleh duplikat dalam satu order', 422);
+        }
+
+        $existingConflicts = OrderItemProductCode::whereIn('kode_produk', $allCodes)
+            ->whereNotIn('order_item_id', $payloadItemIds)
+            ->exists();
+
+        if ($existingConflicts) {
+            return $this->fail('Beberapa kode produk sudah dipakai pada pesanan lain', 422);
+        }
+
+        foreach ($formattedItems as $itemPayload) {
+            $orderItem = $orderItems->get($itemPayload['order_item_id']);
+            if (count($itemPayload['kode_produk']) !== $orderItem->jumlah) {
+                return $this->fail(
+                    "Jumlah kode produk untuk {$orderItem->product?->nama_produk} harus {$orderItem->jumlah}",
+                    422
+                );
+            }
+        }
+
+        DB::transaction(function () use ($formattedItems, $orderItems) {
+            foreach ($formattedItems as $itemPayload) {
+                $this->syncItemProductCodes($orderItems->get($itemPayload['order_item_id']), $itemPayload['kode_produk']);
+            }
+        });
+
+        return $this->success(
+            $order->fresh(['items.product', 'items.productCodes']),
+            'Kode produk berhasil disimpan'
+        );
     }
 
     /**
@@ -264,7 +388,22 @@ class AdminOrderController extends Controller
     {
         $this->authorize('admin');
 
-        $order = Order::findOrFail($orderId);
+        $order = Order::with('items.productCodes')->findOrFail($orderId);
+
+        if ($order->status !== 'diproses') {
+            return $this->fail('Kode produk harus dilengkapi saat status diproses sebelum dikirim', 422);
+        }
+
+        $missingCodes = $order->items->first(function ($item) {
+            return $item->productCodes->count() !== $item->jumlah;
+        });
+
+        if ($missingCodes) {
+            return $this->fail(
+                "Lengkapi kode produk untuk {$missingCodes->product?->nama_produk} sebelum mengirim pesanan",
+                422
+            );
+        }
 
         $data = $request->validate([
             'resi' => ['required', 'string', 'max:100'],
@@ -276,7 +415,7 @@ class AdminOrderController extends Controller
 
         SendOrderShippedNotificationJob::dispatch($order->id);
 
-        return $this->success($order, 'Order diperbarui menjadi dikirim');
+        return $this->success($order->fresh(['items.productCodes']), 'Order diperbarui menjadi dikirim');
     }
 
     /**
@@ -310,7 +449,7 @@ class AdminOrderController extends Controller
         $order->tracking_completed_at = now();
         $order->save();
 
-        return $this->success($order->fresh(), 'Order ditandai selesai');
+        return $this->success($order->fresh(['items.productCodes']), 'Order ditandai selesai');
     }
 
     /**
@@ -329,5 +468,37 @@ class AdminOrderController extends Controller
         ReleaseExpiredReservationJob::dispatch();
 
         return $this->success(null, 'Job release reservasi sudah dijalankan');
+    }
+
+    private function syncItemProductCodes($orderItem, array $codes): void
+    {
+        OrderItemProductCode::where('order_item_id', $orderItem->id)->delete();
+
+        foreach ($codes as $index => $code) {
+            OrderItemProductCode::create([
+                'order_item_id' => $orderItem->id,
+                'kode_produk' => $code,
+                'sequence' => $index + 1,
+            ]);
+        }
+    }
+
+    /**
+     * Tentukan harga tingkat berdasarkan jumlah (qty)
+     * Menggunakan logika yang sama dengan CheckoutController
+     */
+    private function determinePriceTier(int $productId, int $qty): ?int
+    {
+        // Cari harga tingkat global yang sesuai dengan jumlah
+        $tier = PriceTier::global()
+            ->where('min_jumlah', '<=', $qty)
+            ->where(function ($query) use ($qty) {
+                $query->whereNull('max_jumlah')
+                    ->orWhere('max_jumlah', '>=', $qty);
+            })
+            ->orderByDesc('min_jumlah')
+            ->first();
+
+        return $tier?->id;
     }
 }

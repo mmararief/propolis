@@ -24,9 +24,14 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $orders = $request->user()->orders()
-            ->with('items.product')
+            ->with(['items.product', 'items.productCodes'])
             ->orderByDesc('created_at')
             ->paginate(10);
+
+        // Cek dan update status untuk setiap order yang expired
+        foreach ($orders->items() as $order) {
+            $this->checkAndUpdateExpiredOrder($order);
+        }
 
         return $this->success($orders);
     }
@@ -50,7 +55,7 @@ class OrderController extends Controller
             return $this->fail('ID pesanan tidak valid', 422);
         }
 
-        $order = Order::with(['items.product', 'items.batches.batch'])->find($id);
+        $order = Order::with(['items.product', 'items.productCodes'])->find($id);
 
         if (!$order) {
             return $this->fail('Pesanan tidak ditemukan', 404);
@@ -58,7 +63,53 @@ class OrderController extends Controller
 
         $this->authorize('view', $order);
 
-        return $this->success($order);
+        // Cek dan update status jika order sudah expired
+        $this->checkAndUpdateExpiredOrder($order);
+
+        return $this->success($order->fresh(['items.product', 'items.productCodes']));
+    }
+
+    /**
+     * Cek apakah order sudah expired dan update status jika perlu
+     */
+    private function checkAndUpdateExpiredOrder(Order $order): void
+    {
+        // Hanya cek untuk order yang belum dibayar atau menunggu konfirmasi
+        if (!in_array($order->status, ['belum_dibayar', 'menunggu_konfirmasi'])) {
+            return;
+        }
+
+        $isExpired = false;
+
+        // Cek berdasarkan reservation_expires_at
+        if ($order->reservation_expires_at) {
+            $isExpired = Carbon::now()->greaterThan($order->reservation_expires_at);
+        } else {
+            // Cek berdasarkan waktu order dibuat (lebih dari 1 jam)
+            $orderDate = $order->ordered_at ? Carbon::parse($order->ordered_at) : Carbon::parse($order->created_at);
+            $expiryDate = $orderDate->copy()->addHour();
+            $isExpired = Carbon::now()->greaterThanOrEqualTo($expiryDate);
+        }
+
+        if ($isExpired) {
+            // Reload order dengan items untuk memastikan data terbaru
+            $order->load('items');
+
+            // Release reservasi jika ada
+            if ($order->items->isNotEmpty()) {
+                $hasAllocatedItems = $order->items->some(fn($item) => $item->allocated);
+
+                if ($hasAllocatedItems) {
+                    $this->allocationService->releaseAllocation($order);
+                } else {
+                    $this->allocationService->releaseReservation($order);
+                }
+            }
+
+            // Update status menjadi expired
+            $order->status = 'expired';
+            $order->save();
+        }
     }
 
     /**
@@ -176,7 +227,7 @@ class OrderController extends Controller
      *     path="/orders/{id}/cancel",
      *     tags={"Orders"},
      *     summary="Batalkan pesanan",
-     *     description="Membatalkan pesanan dengan status 'belum_dibayar', 'menunggu_konfirmasi', atau 'expired'. Otomatis melepas reservasi/allokasi batch dan mengembalikan stok.",
+     *     description="Membatalkan pesanan dengan status 'belum_dibayar' atau 'menunggu_konfirmasi'. Otomatis melepas reservasi/allokasi batch dan mengembalikan stok. Pesanan yang sudah expired tidak dapat dibatalkan.",
      *     security={{"sanctum": {}}},
      *     @OA\Parameter(
      *         name="id",
@@ -206,7 +257,7 @@ class OrderController extends Controller
         }
 
         /** @var Order|null $order */
-        $order = Order::with(['items.batches', 'items'])->find($orderId);
+        $order = Order::with(['items.productCodes', 'items'])->find($orderId);
 
         if (! $order) {
             return $this->fail('Pesanan tidak ditemukan', 404);
@@ -216,16 +267,19 @@ class OrderController extends Controller
             return $this->fail('Anda tidak berhak mengubah pesanan ini', 403);
         }
 
-        // Status yang bisa dibatalkan
-        $cancellableStatuses = ['belum_dibayar', 'menunggu_konfirmasi', 'expired'];
+        // Status yang bisa dibatalkan (expired tidak bisa dibatalkan karena sudah tidak aktif)
+        $cancellableStatuses = ['belum_dibayar', 'menunggu_konfirmasi'];
 
         if (! in_array($order->status, $cancellableStatuses)) {
+            if ($order->status === 'expired') {
+                return $this->fail('Pesanan yang sudah kedaluwarsa tidak dapat dibatalkan', 422);
+            }
             return $this->fail('Pesanan dengan status ini tidak dapat dibatalkan', 422);
         }
 
         // Jika order sudah dialokasikan batch, lepas allokasi (kembalikan qty_remaining)
         // Jika masih reservasi, lepas reservasi saja
-        if ($order->items->isNotEmpty() && $order->items->first()->batches->isNotEmpty()) {
+        if ($order->items->isNotEmpty()) {
             $hasAllocatedItems = $order->items->some(fn($item) => $item->allocated);
 
             if ($hasAllocatedItems) {
