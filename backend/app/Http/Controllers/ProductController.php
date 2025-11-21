@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Category;
+use App\Services\StockMovementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Annotations as OA;
@@ -165,6 +166,15 @@ class ProductController extends Controller
 
         $product = Product::create($data);
 
+        if (($product->stok ?? 0) > 0) {
+            StockMovementService::record(
+                $product,
+                (int) $product->stok,
+                'initial_stock',
+                ['note' => 'Stok awal saat membuat produk']
+            );
+        }
+
         return $this->success($product->fresh(), 'Produk berhasil dibuat', 201);
     }
 
@@ -249,7 +259,20 @@ class ProductController extends Controller
             $data['gambar'] = !empty($currentImages) ? $currentImages : null;
         }
 
-        $product->fill($data)->save();
+        $originalStock = (int) $product->stok;
+
+        $product->fill($data);
+        $product->save();
+
+        if ($product->wasChanged('stok')) {
+            $stockChange = (int) $product->stok - $originalStock;
+            StockMovementService::record(
+                $product,
+                $stockChange,
+                'manual_adjustment',
+                ['note' => 'Perubahan stok melalui pembaruan produk']
+            );
+        }
 
         return $this->success($product->fresh(), 'Produk berhasil diperbarui');
     }
@@ -292,6 +315,13 @@ class ProductController extends Controller
 
         $product->stok = $newStock;
         $product->save();
+
+        StockMovementService::record(
+            $product,
+            (int) $data['qty'],
+            'manual_adjustment',
+            ['note' => 'Penyesuaian stok manual']
+        );
 
         return $this->success($product->fresh(), 'Stok berhasil diperbarui');
     }

@@ -334,12 +334,12 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                         {item.product_codes?.length > 0 && !canEditCodes && (
                           <p className="text-xs text-slate-500 mt-1">
                             Kode tersimpan: {item.product_codes.map((code) => code.kode_produk).join(', ')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                                        </p>
+                                      )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                 {canEditCodes && order.items?.length > 0 && (
                   <div className="flex justify-end mt-4">
                     <button
@@ -350,8 +350,8 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                     >
                       {isSavingCodes ? 'Menyimpan...' : 'Simpan Semua Kode Produk'}
                     </button>
-                  </div>
-                )}
+                        </div>
+                      )}
               </div>
 
               {/* Shipping Address */}

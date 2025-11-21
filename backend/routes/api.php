@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\StockMovementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
@@ -79,9 +80,12 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::put('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'update']);
     Route::delete('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'destroy']);
 
-    Route::get('/reports/summary', [ReportController::class, 'summary']);
+    Route::get('/reports/stock', [ReportController::class, 'stockReport']);
+    Route::get('/reports/sales-detail', [ReportController::class, 'salesDetail']);
     Route::get('/reports/sales-trend', [ReportController::class, 'salesTrend']);
-    Route::get('/reports/product-sales', [ReportController::class, 'productSales']);
-    Route::get('/reports/channel-performance', [ReportController::class, 'channelPerformance']);
-    Route::get('/reports/export/product-sales', [ReportController::class, 'exportProductSales']);
+    Route::get('/reports/export/stock-movements', [ReportController::class, 'exportStockMovements']);
+    Route::get('/reports/stock-history', [ReportController::class, 'stockHistory']);
+    Route::get('/reports/export/stock-history', [ReportController::class, 'exportStockHistory']);
+
+    Route::get('/admin/stock-movements', [StockMovementController::class, 'index']);
 });

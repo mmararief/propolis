@@ -8,15 +8,17 @@ const AdminLayout = () => {
       <AdminSidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-[#f7f7f7]">
         {/* Header Bar */}
         <header className="bg-[#4a4a4a] text-white px-6 py-3">
           <h1 className="text-sm font-medium">Dashboard admin</h1>
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6 bg-white">
-          <Outlet />
+        <main className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto w-full p-6">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

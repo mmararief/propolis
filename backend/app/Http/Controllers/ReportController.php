@@ -3,187 +3,414 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\StockMovement;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use OpenApi\Annotations as OA;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
 {
-    public function summary(Request $request)
+
+    /**
+     * @OA\Get(
+     *     path="/reports/stock",
+     *     tags={"Reports"},
+     *     summary="Laporan stok produk",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="search", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Daftar stok produk")
+     * )
+     */
+    public function stockReport(Request $request)
+    {
+        $this->authorize('admin');
+
+        $perPage = min($request->integer('per_page', 50), 200);
+        $sortable = ['nama_produk', 'sku', 'stok', 'stok_available'];
+        $sort = $request->input('sort', 'nama_produk');
+        if (! in_array($sort, $sortable, true)) {
+            $sort = 'nama_produk';
+        }
+        $direction = $request->input('direction', 'asc') === 'desc' ? 'desc' : 'asc';
+
+        $query = Product::query()
+            ->select(['id', 'nama_produk', 'sku', 'stok', 'stok_reserved', 'status', 'updated_at'])
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
+            ->when($search = $request->string('search')->toString(), function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('nama_produk', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy($sort === 'stok_available' ? DB::raw('(stok - COALESCE(stok_reserved,0))') : $sort, $direction);
+
+        $products = $query->paginate($perPage)->through(function (Product $product) {
+            return [
+                'id' => $product->id,
+                'nama_produk' => $product->nama_produk,
+                'sku' => $product->sku,
+                'stok' => (int) $product->stok,
+                'stok_reserved' => (int) $product->stok_reserved,
+                'stok_available' => $product->stok_available,
+                'status' => $product->status,
+                'updated_at' => $product->updated_at,
+            ];
+        });
+
+        return $this->success($products);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/reports/sales-detail",
+     *     tags={"Reports"},
+     *     summary="Laporan detail penjualan",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="from", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="to", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="channel", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="search", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Daftar penjualan detail")
+     * )
+     */
+    public function salesDetail(Request $request)
     {
         $this->authorize('admin');
 
         [$from, $to] = $this->resolveDateRange($request);
-
+        $perPage = min($request->integer('per_page', 20), 100);
         $orderDateExpr = DB::raw('COALESCE(orders.ordered_at, orders.created_at)');
-        $baseOrders = Order::query()
-            ->whereBetween($orderDateExpr, [$from, $to]);
 
-        $completedOrders = (clone $baseOrders)->whereIn('status', ['diproses', 'dikirim', 'selesai']);
-
-        $summary = [
-            'total_orders' => (clone $baseOrders)->count(),
-            'completed_orders' => (clone $completedOrders)->count(),
-            'pending_orders' => (clone $baseOrders)->where('status', 'menunggu_konfirmasi')->count(),
-            'gross_revenue' => (clone $completedOrders)->sum('subtotal'),
-            'net_revenue' => (clone $completedOrders)->sum('total'),
-        ];
-
-        $topProducts = OrderItem::query()
-            ->select([
-                'products.id as product_id',
-                'products.nama_produk',
-                'products.sku',
-                DB::raw('SUM(order_items.jumlah) as qty_sold'),
-                DB::raw('SUM(order_items.total_harga) as revenue'),
-            ])
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
-            ->whereIn('orders.status', ['diproses', 'dikirim', 'selesai'])
+        $query = Order::with([
+            'user:id,nama_lengkap',
+            'items.product:id,nama_produk,sku',
+            'items.productCodes:id,order_item_id,kode_produk',
+        ])
             ->whereBetween($orderDateExpr, [$from, $to])
-            ->groupBy('products.id', 'products.nama_produk', 'products.sku')
-            ->orderByDesc('qty_sold')
-            ->limit(5)
-            ->get();
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('channel'), fn($q) => $q->where('channel', $request->string('channel')))
+            ->when($search = $request->string('search')->toString(), function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('customer_name', 'like', "%{$search}%")
+                        ->orWhere('external_order_id', 'like', "%{$search}%")
+                        ->orWhere('orders.id', $search);
+                });
+            })
+            ->orderByDesc($orderDateExpr);
 
-        $lowStock = Product::query()
-            ->orderByRaw('(stok - COALESCE(stok_reserved, 0))')
-            ->limit(5)
-            ->get()
-            ->map(fn($product) => [
-                'product_id' => $product->id,
-                'nama_produk' => $product->nama_produk,
-                'sku' => $product->sku,
-                'batch_number' => $product->sku,
-                'available' => $product->stok_available,
-                'expiry_date' => null,
-            ]);
+        $orders = $query->paginate($perPage)->through(function (Order $order) {
+            return [
+                'id' => $order->id,
+                'external_order_id' => $order->external_order_id,
+                'customer_name' => $order->customer_name ?? $order->user?->nama_lengkap,
+                'status' => $order->status,
+                'channel' => $order->channel,
+                'ordered_at' => $order->ordered_at ?? $order->created_at,
+                'total' => $order->total,
+                'total_items' => $order->items->sum('jumlah'),
+                'items' => $order->items->map(function ($item) {
+                    return [
+                        'product_name' => $item->product->nama_produk ?? 'Produk dihapus',
+                        'product_sku' => $item->product->sku ?? null,
+                        'qty' => $item->jumlah,
+                        'unit_price' => $item->harga_satuan,
+                        'total_price' => $item->total_harga,
+                        'codes' => $item->productCodes->pluck('kode_produk')->filter()->values(),
+                    ];
+                }),
+            ];
+        });
 
-        return $this->success([
-            'summary' => $summary,
-            'top_products' => $topProducts,
-            'low_stock_batches' => $lowStock,
-        ]);
+        return $this->success($orders);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/reports/sales-trend",
+     *     tags={"Reports"},
+     *     summary="Ringkasan tren penjualan",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="from", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="to", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="interval", in="query", @OA\Schema(type="string", enum={"daily","weekly"})),
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="channel", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="Daftar titik tren")
+     * )
+     */
     public function salesTrend(Request $request)
     {
         $this->authorize('admin');
 
+        [$from, $to] = $this->resolveDateRange($request);
         $interval = $request->input('interval', 'daily');
-        [$from, $to] = $this->resolveDateRange($request);
-        $dateExpr = DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))');
+        $interval = in_array($interval, ['daily', 'weekly'], true) ? $interval : 'daily';
 
-        $query = Order::query()
-            ->select([
-                DB::raw($interval === 'weekly'
-                    ? "DATE_FORMAT(COALESCE(ordered_at, created_at), '%x-%v') as label"
-                    : "DATE(COALESCE(ordered_at, created_at)) as label"),
-                DB::raw('SUM(total) as revenue'),
-                DB::raw('COUNT(*) as orders_count'),
-            ])
-            ->whereBetween(DB::raw('COALESCE(ordered_at, created_at)'), [$from, $to])
-            ->whereIn('status', ['diproses', 'dikirim', 'selesai'])
-            ->groupBy('label')
-            ->orderBy('label');
+        $orderDateExprSql = 'COALESCE(orders.ordered_at, orders.created_at)';
+        $orderDateExpr = DB::raw($orderDateExprSql);
 
-        return $this->success($query->get());
-    }
-
-    public function productSales(Request $request)
-    {
-        $this->authorize('admin');
-
-        [$from, $to] = $this->resolveDateRange($request);
-        $perPage = min($request->integer('per_page', 25), 100);
-        $orderDateExpr = DB::raw('COALESCE(orders.ordered_at, orders.created_at)');
-
-        $query = OrderItem::query()
-            ->select([
-                'products.id as product_id',
-                'products.nama_produk',
-                'products.sku',
-                DB::raw('SUM(order_items.jumlah) as qty_sold'),
-                DB::raw('SUM(order_items.total_harga) as revenue'),
-            ])
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
-            ->whereIn('orders.status', ['diproses', 'dikirim', 'selesai'])
+        $daily = Order::query()
+            ->selectRaw("DATE({$orderDateExprSql}) as day")
+            ->selectRaw('COUNT(*) as orders_count')
+            ->selectRaw('SUM(total) as revenue')
             ->whereBetween($orderDateExpr, [$from, $to])
-            ->groupBy('products.id', 'products.nama_produk', 'products.sku');
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('channel'), fn($q) => $q->where('channel', $request->string('channel')))
+            ->groupBy('day')
+            ->orderBy('day')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'date' => Carbon::parse($row->day)->startOfDay(),
+                    'orders_count' => (int) $row->orders_count,
+                    'revenue' => (int) $row->revenue,
+                ];
+            });
 
-        if ($search = $request->string('search')->toString()) {
-            $query->where(function ($q) use ($search) {
-                $q->where('products.nama_produk', 'like', "%{$search}%")
-                    ->orWhere('products.sku', 'like', "%{$search}%");
+        if ($interval === 'weekly') {
+            $grouped = [];
+            foreach ($daily as $entry) {
+                $weekLabel = $entry['date']->copy()->startOfWeek()->format('Y-m-d');
+                if (! isset($grouped[$weekLabel])) {
+                    $grouped[$weekLabel] = [
+                        'date' => Carbon::parse($weekLabel),
+                        'orders_count' => 0,
+                        'revenue' => 0,
+                    ];
+                }
+                $grouped[$weekLabel]['orders_count'] += $entry['orders_count'];
+                $grouped[$weekLabel]['revenue'] += $entry['revenue'];
+            }
+
+            $trend = collect($grouped)
+                ->sortBy('date')
+                ->values()
+                ->map(function ($entry) {
+                    return [
+                        'label' => $entry['date']->format('d M Y'),
+                        'orders_count' => $entry['orders_count'],
+                        'revenue' => $entry['revenue'],
+                    ];
+                });
+        } else {
+            $trend = $daily->map(function ($entry) {
+                return [
+                    'label' => $entry['date']->format('d M'),
+                    'orders_count' => $entry['orders_count'],
+                    'revenue' => $entry['revenue'],
+                ];
             });
         }
 
-        $query->orderByDesc('revenue');
-
-        return $this->success($query->paginate($perPage));
+        return $this->success($trend);
     }
 
-    public function channelPerformance(Request $request)
+    /**
+     * @OA\Get(
+     *     path="/reports/export/stock-movements",
+     *     tags={"Reports"},
+     *     summary="Ekspor riwayat stok (CSV)",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="month", in="query", description="Format Y-m, misal 2025-08", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="start_date", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="end_date", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="product_ids[]", in="query", @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="File CSV berisi ringkasan stok")
+     * )
+     */
+    public function exportStockMovements(Request $request): StreamedResponse
     {
         $this->authorize('admin');
 
-        [$from, $to] = $this->resolveDateRange($request);
-        $orderDateExpr = DB::raw('COALESCE(ordered_at, created_at)');
+        $validated = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+        ]);
 
-        $data = Order::query()
-            ->select([
-                DB::raw("COALESCE(channel, 'online') as channel"),
-                DB::raw('COUNT(*) as orders_count'),
-                DB::raw('SUM(total) as revenue'),
+        if (! empty($validated['month'])) {
+            $startDate = Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth();
+            $endDate = (clone $startDate)->endOfMonth();
+        } else {
+            $startDate = ! empty($validated['start_date'])
+                ? Carbon::parse($validated['start_date'])->startOfDay()
+                : Carbon::now()->startOfMonth();
+
+            $endDate = ! empty($validated['end_date'])
+                ? Carbon::parse($validated['end_date'])->endOfDay()
+                : (clone $startDate)->endOfMonth();
+        }
+
+        if ($startDate->gt($endDate)) {
+            throw ValidationException::withMessages([
+                'end_date' => ['Tanggal mulai tidak boleh lebih besar dari tanggal akhir'],
+            ]);
+        }
+
+        $productQuery = Product::query()->orderBy('nama_produk');
+        $productIds = $validated['product_ids'] ?? null;
+        if (! empty($productIds)) {
+            $productQuery->whereIn('id', $productIds);
+        }
+
+        $products = $productQuery->get();
+
+        $movementQuery = StockMovement::query()
+            ->select('product_id')
+            ->selectRaw("
+                SUM(CASE WHEN created_at < ? THEN change_qty ELSE 0 END) as opening_stock,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? AND change_qty > 0 THEN change_qty ELSE 0 END) as stock_in,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? AND change_qty < 0 THEN change_qty ELSE 0 END) as stock_out
+            ", [
+                $startDate,
+                $startDate,
+                $endDate,
+                $startDate,
+                $endDate,
             ])
-            ->whereBetween($orderDateExpr, [$from, $to])
-            ->groupBy('channel')
-            ->orderByDesc('revenue')
-            ->get();
+            ->groupBy('product_id');
 
-        return $this->success($data);
-    }
+        if (! empty($productIds)) {
+            $movementQuery->whereIn('product_id', $productIds);
+        }
 
-    public function exportProductSales(Request $request): StreamedResponse
-    {
-        $this->authorize('admin');
+        $aggregates = $movementQuery->get()->keyBy('product_id');
+        $filename = sprintf('stock-movements-%s.csv', $startDate->format('Y-m'));
 
-        [$from, $to] = $this->resolveDateRange($request);
-        $orderDateExpr = DB::raw('COALESCE(orders.ordered_at, orders.created_at)');
-
-        $rows = OrderItem::query()
-            ->select([
-                'products.nama_produk',
-                'products.sku',
-                DB::raw('SUM(order_items.jumlah) as qty_sold'),
-                DB::raw('SUM(order_items.total_harga) as revenue'),
-            ])
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
-            ->whereIn('orders.status', ['diproses', 'dikirim', 'selesai'])
-            ->whereBetween($orderDateExpr, [$from, $to])
-            ->groupBy('products.nama_produk', 'products.sku')
-            ->orderByDesc('revenue')
-            ->get();
-
-        return response()->streamDownload(function () use ($rows) {
+        return response()->streamDownload(function () use ($products, $aggregates, $startDate, $endDate) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Produk', 'SKU', 'Qty Terjual', 'Revenue']);
-            foreach ($rows as $row) {
+            fputcsv($handle, ['Periode', $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y')]);
+            fputcsv($handle, ['Produk', 'SKU', 'Stok Awal', 'Stok Masuk', 'Stok Keluar', 'Stok Akhir']);
+
+            foreach ($products as $product) {
+                $data = $aggregates->get($product->id);
+                $opening = (int) ($data->opening_stock ?? 0);
+                $stockIn = (int) ($data->stock_in ?? 0);
+                $stockOut = (int) ($data->stock_out ?? 0);
+                $closing = $opening + $stockIn + $stockOut;
+
                 fputcsv($handle, [
-                    $row->nama_produk,
-                    $row->sku,
-                    $row->qty_sold,
-                    $row->revenue,
+                    $product->nama_produk,
+                    $product->sku,
+                    $opening,
+                    $stockIn,
+                    abs($stockOut),
+                    $closing,
                 ]);
             }
+
             fclose($handle);
-        }, 'product-sales.csv', ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/reports/stock-history",
+     *     tags={"Reports"},
+     *     summary="Riwayat stok per produk per periode",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="start_date", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="end_date", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="interval", in="query", @OA\Schema(type="string", enum={"daily","weekly","monthly"})),
+     *     @OA\Parameter(name="product_ids[]", in="query", @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Matriks stok per tanggal")
+     * )
+     */
+    public function stockHistory(Request $request)
+    {
+        $this->authorize('admin');
+
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'interval' => ['nullable', 'in:daily,weekly,monthly'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+        ]);
+
+        [$startDate, $endDate] = $this->resolveHistoryRange($validated);
+        $interval = $validated['interval'] ?? 'monthly';
+        $productIds = $validated['product_ids'] ?? null;
+
+        $history = $this->buildStockHistoryData($startDate, $endDate, $interval, $productIds);
+
+        return $this->success($history);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/reports/export/stock-history",
+     *     tags={"Reports"},
+     *     summary="Ekspor riwayat stok seperti spreadsheet (CSV)",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="start_date", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="end_date", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="interval", in="query", @OA\Schema(type="string", enum={"daily","weekly","monthly"})),
+     *     @OA\Parameter(name="product_ids[]", in="query", @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="File CSV riwayat stok")
+     * )
+     */
+    public function exportStockHistory(Request $request): StreamedResponse
+    {
+        $this->authorize('admin');
+
+        $validated = $request->validate([
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'interval' => ['nullable', 'in:daily,weekly,monthly'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+        ]);
+
+        [$startDate, $endDate] = $this->resolveHistoryRange($validated);
+        $interval = $validated['interval'] ?? 'monthly';
+        $productIds = $validated['product_ids'] ?? null;
+        $history = $this->buildStockHistoryData($startDate, $endDate, $interval, $productIds);
+
+        $filename = sprintf(
+            'stock-history-%s-sampai-%s.csv',
+            $startDate->format('Ymd'),
+            $endDate->format('Ymd')
+        );
+
+        return response()->streamDownload(function () use ($history) {
+            $handle = fopen('php://output', 'w');
+            $headers = ['Tanggal'];
+            foreach ($history['products'] as $product) {
+                $label = $product['nama_produk'] . ($product['sku'] ? " ({$product['sku']})" : '');
+                $headers[] = trim($label) !== '' ? $label : 'Produk';
+            }
+            $headers = array_merge($headers, ['Terjual', 'Beli Stock', 'Total Stock']);
+            fputcsv($handle, $headers);
+
+            foreach ($history['segments'] as $segment) {
+                $row = [
+                    Carbon::parse($segment['date'])->format('d/m/Y'),
+                ];
+
+                foreach ($history['products'] as $product) {
+                    $row[] = $segment['products'][$product['id']] ?? 0;
+                }
+
+                $row[] = $segment['notes']['sold'] ?? 0;
+                $row[] = $segment['notes']['restock'] ?? 0;
+                $row[] = $segment['notes']['total_stock'] ?? 0;
+
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     private function resolveDateRange(Request $request): array
@@ -202,5 +429,155 @@ class ReportController extends Controller
             : Carbon::now()->endOfDay();
 
         return [$from, $to];
+    }
+
+    private function resolveHistoryRange(array $validated): array
+    {
+        $startDate = ! empty($validated['start_date'])
+            ? Carbon::parse($validated['start_date'])->startOfDay()
+            : Carbon::now()->subDays(30)->startOfDay();
+
+        $endDate = ! empty($validated['end_date'])
+            ? Carbon::parse($validated['end_date'])->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        if ($startDate->gt($endDate)) {
+            throw ValidationException::withMessages([
+                'end_date' => ['Tanggal mulai tidak boleh lebih besar dari tanggal akhir'],
+            ]);
+        }
+
+        return [$startDate, $endDate];
+    }
+
+    private function buildStockHistoryData(Carbon $startDate, Carbon $endDate, string $interval, ?array $productIds = null): array
+    {
+        $segments = $this->buildHistorySegments($startDate, $endDate, $interval);
+        if (empty($segments)) {
+            return ['products' => [], 'segments' => []];
+        }
+
+        $productQuery = Product::query()->orderBy('nama_produk');
+        if (! empty($productIds)) {
+            $productQuery->whereIn('id', $productIds);
+        }
+
+        $products = $productQuery->get(['id', 'nama_produk', 'sku']);
+        if ($products->isEmpty()) {
+            return ['products' => [], 'segments' => []];
+        }
+
+        $firstStart = $segments[0]['start'];
+        $lastEnd = $segments[array_key_last($segments)]['end'];
+
+        $openingBalances = StockMovement::query()
+            ->select('product_id')
+            ->selectRaw('SUM(change_qty) as opening_stock')
+            ->where('created_at', '<', $firstStart)
+            ->when(! empty($productIds), fn($q) => $q->whereIn('product_id', $productIds))
+            ->groupBy('product_id')
+            ->pluck('opening_stock', 'product_id');
+
+        $dailyMovements = StockMovement::query()
+            ->select('product_id')
+            ->selectRaw('DATE(created_at) as movement_date')
+            ->selectRaw('SUM(change_qty) as net_change')
+            ->selectRaw('SUM(CASE WHEN change_qty > 0 THEN change_qty ELSE 0 END) as stock_in')
+            ->selectRaw('SUM(CASE WHEN change_qty < 0 THEN ABS(change_qty) ELSE 0 END) as stock_out')
+            ->whereBetween('created_at', [$firstStart, $lastEnd])
+            ->when(! empty($productIds), fn($q) => $q->whereIn('product_id', $productIds))
+            ->groupBy('product_id', 'movement_date')
+            ->orderBy('product_id')
+            ->orderBy('movement_date')
+            ->get()
+            ->groupBy('product_id')
+            ->map(function ($items) {
+                return $items->map(function ($item) {
+                    return [
+                        'date' => Carbon::parse($item->movement_date)->startOfDay(),
+                        'net' => (int) $item->net_change,
+                        'in' => (int) $item->stock_in,
+                        'out' => (int) $item->stock_out,
+                    ];
+                })->values()->all();
+            });
+
+        $productStates = [];
+        $movementPointers = [];
+        foreach ($products as $product) {
+            $productStates[$product->id] = (int) ($openingBalances[$product->id] ?? 0);
+            $movementPointers[$product->id] = 0;
+        }
+
+        $historyRows = [];
+        foreach ($segments as $segment) {
+            $rowProducts = [];
+            $segmentSold = 0;
+            $segmentRestock = 0;
+
+            foreach ($products as $product) {
+                $movements = $dailyMovements->get($product->id, []);
+                $pointer = $movementPointers[$product->id];
+
+                while ($pointer < count($movements) && $movements[$pointer]['date']->lte($segment['end'])) {
+                    $productStates[$product->id] += $movements[$pointer]['net'];
+                    $segmentRestock += $movements[$pointer]['in'];
+                    $segmentSold += $movements[$pointer]['out'];
+                    $pointer++;
+                }
+
+                $movementPointers[$product->id] = $pointer;
+                $rowProducts[$product->id] = $productStates[$product->id];
+            }
+
+            $historyRows[] = [
+                'date' => $segment['label'],
+                'products' => $rowProducts,
+                'notes' => [
+                    'sold' => $segmentSold,
+                    'restock' => $segmentRestock,
+                    'total_stock' => array_sum($rowProducts),
+                ],
+            ];
+        }
+
+        return [
+            'products' => $products->map(fn($product) => [
+                'id' => $product->id,
+                'nama_produk' => $product->nama_produk,
+                'sku' => $product->sku,
+            ])->values()->all(),
+            'segments' => $historyRows,
+        ];
+    }
+
+    private function buildHistorySegments(Carbon $startDate, Carbon $endDate, string $interval): array
+    {
+        $interval = in_array($interval, ['daily', 'weekly', 'monthly'], true) ? $interval : 'monthly';
+        $segments = [];
+        $cursor = $startDate->copy()->startOfDay();
+
+        while ($cursor->lte($endDate)) {
+            $segmentStart = $cursor->copy();
+            $segmentEnd = match ($interval) {
+                'weekly' => $cursor->copy()->endOfWeek(),
+                'monthly' => $cursor->copy()->endOfMonth(),
+                default => $cursor->copy(),
+            };
+
+            if ($segmentEnd->gt($endDate)) {
+                $segmentEnd = $endDate->copy();
+            }
+
+            $segments[] = [
+                'label' => $segmentEnd->toDateString(),
+                'start' => $segmentStart->copy()->startOfDay(),
+                'end' => $segmentEnd->copy()->endOfDay(),
+            ];
+
+            $cursor = $segmentEnd->copy()->addDay()->startOfDay();
+        }
+
+        return $segments;
     }
 }

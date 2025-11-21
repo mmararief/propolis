@@ -29,7 +29,7 @@ const AdminSidebar = () => {
   };
 
   return (
-    <div className="w-64 bg-[#D2001A] min-h-screen flex flex-col">
+    <div className="w-72 bg-[#D2001A] min-h-screen flex flex-col">
       {/* Logo Section */}
       <div className="p-6 border-b border-red-800">
         <h1 className="text-white font-bold text-xl mb-1">BRITISH PROPOLIS</h1>

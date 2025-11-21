@@ -1,179 +1,153 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../../api/client';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
-const KPI_CARDS = [
-  { key: 'total_orders', label: 'Total Pesanan' },
-  { key: 'completed_orders', label: 'Pesanan Selesai' },
-  { key: 'pending_orders', label: 'Menunggu' },
-  { key: 'gross_revenue', label: 'Omzet' },
+const PAGE_SIZE = 25;
+
+const STATUS_OPTIONS = [
+  { label: 'Semua Status', value: '' },
+  { label: 'Belum Dibayar', value: 'belum_dibayar' },
+  { label: 'Menunggu Konfirmasi', value: 'menunggu_konfirmasi' },
+  { label: 'Diproses', value: 'diproses' },
+  { label: 'Dikirim', value: 'dikirim' },
+  { label: 'Selesai', value: 'selesai' },
+  { label: 'Dibatalkan', value: 'dibatalkan' },
+  { label: 'Expired', value: 'expired' },
 ];
 
-const TABS = [
-  { id: 'stock', label: 'Stok Produk' },
-  { id: 'products', label: 'Penjualan Produk' },
-  { id: 'channels', label: 'Performa Channel' },
+const CHANNEL_OPTIONS = [
+  { label: 'Semua Channel', value: '' },
+  { label: 'Online', value: 'online' },
+  { label: 'Offline', value: 'offline' },
+  { label: 'Shopee', value: 'shopee' },
+  { label: 'Tokopedia', value: 'tokopedia' },
+  { label: 'Tiktok Shop', value: 'tiktokshop' },
+  { label: 'WhatsApp', value: 'whatsapp' },
+  { label: 'Lainnya', value: 'lainnya' },
+];
+
+const HISTORY_INTERVAL_OPTIONS = [
+  { label: 'Harian', value: 'daily' },
+  { label: 'Mingguan', value: 'weekly' },
+  { label: 'Bulanan', value: 'monthly' },
+];
+
+const TREND_INTERVAL_OPTIONS = [
+  { label: 'Harian', value: 'daily' },
+  { label: 'Mingguan', value: 'weekly' },
 ];
 
 const AdminReportsPage = () => {
-  const [filters, setFilters] = useState({ from: '', to: '', interval: 'daily' });
-  const [activeTab, setActiveTab] = useState('stock');
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState({ sales: false, history: false, trend: false });
 
-  const [summaryData, setSummaryData] = useState(null);
-  const [trend, setTrend] = useState([]);
-  const [stock, setStock] = useState([]);
-  const [productReport, setProductReport] = useState({ data: [], meta: null });
-  const [channelReport, setChannelReport] = useState([]);
-
-  const [productSearch, setProductSearch] = useState('');
-
-  const [loading, setLoading] = useState({
-    summary: false,
-    trend: false,
-    stock: false,
-    products: false,
-    channels: false,
+  const [salesFilters, setSalesFilters] = useState({
+    from: '',
+    to: '',
+    status: '',
+    channel: '',
+    search: '',
   });
+  const [salesData, setSalesData] = useState({ rows: [], meta: null });
+
+  const [historyFilters, setHistoryFilters] = useState({
+    from: '',
+    to: '',
+    interval: 'monthly',
+  });
+  const [historyData, setHistoryData] = useState({ products: [], segments: [] });
+  const [trendInterval, setTrendInterval] = useState('daily');
+  const [trendData, setTrendData] = useState([]);
 
   const formatCurrency = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
   const formatNumber = (value) => Number(value || 0).toLocaleString('id-ID');
+  const formatDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
-  const commonParams = () => ({
-    from: filters.from || undefined,
-    to: filters.to || undefined,
-  });
-
-  const fetchSummary = async () => {
-    setLoading((prev) => ({ ...prev, summary: true }));
+  const fetchSales = async (page = 1) => {
+    setError(null);
+    setLoading((prev) => ({ ...prev, sales: true }));
     try {
-      const { data } = await api.get('/reports/summary', { params: commonParams() });
-      setSummaryData(data.data ?? data ?? null);
+      const { data } = await api.get('/reports/sales-detail', {
+        params: {
+          from: salesFilters.from || undefined,
+          to: salesFilters.to || undefined,
+          status: salesFilters.status || undefined,
+          channel: salesFilters.channel || undefined,
+          search: salesFilters.search || undefined,
+          per_page: PAGE_SIZE,
+          page,
+        },
+      });
+      setSalesData({
+        rows: data.data?.data ?? data.data ?? [],
+        meta: data.data?.meta ?? data.meta ?? null,
+      });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Gagal memuat laporan penjualan');
     } finally {
-      setLoading((prev) => ({ ...prev, summary: false }));
+      setLoading((prev) => ({ ...prev, sales: false }));
     }
   };
 
+  useEffect(() => {
+    fetchSales(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesFilters.from, salesFilters.to, salesFilters.status, salesFilters.channel, salesFilters.search]);
+
   const fetchTrend = async () => {
+    setError(null);
     setLoading((prev) => ({ ...prev, trend: true }));
     try {
       const { data } = await api.get('/reports/sales-trend', {
-        params: { ...commonParams(), interval: filters.interval },
+        params: {
+          from: salesFilters.from || undefined,
+          to: salesFilters.to || undefined,
+          interval: trendInterval,
+          status: salesFilters.status || undefined,
+          channel: salesFilters.channel || undefined,
+        },
       });
-      setTrend(data.data ?? data ?? []);
+      setTrendData(data.data ?? data ?? []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Gagal memuat grafik penjualan');
     } finally {
       setLoading((prev) => ({ ...prev, trend: false }));
     }
   };
 
-  const fetchStock = async () => {
-    setLoading((prev) => ({ ...prev, stock: true }));
-    try {
-      const { data } = await api.get('/reports/batch-stock', { params: commonParams() });
-      setStock(data.data ?? data ?? []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading((prev) => ({ ...prev, stock: false }));
-    }
-  };
-
-  const fetchProductSales = async (page = 1) => {
-    setLoading((prev) => ({ ...prev, products: true }));
-    try {
-      const { data } = await api.get('/reports/product-sales', {
-        params: { ...commonParams(), search: productSearch || undefined, page },
-      });
-      setProductReport({
-        data: data.data?.data ?? data.data ?? [],
-        meta: data.data?.meta ?? data.meta ?? null,
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading((prev) => ({ ...prev, products: false }));
-    }
-  };
-
-  const fetchChannelPerformance = async () => {
-    setLoading((prev) => ({ ...prev, channels: true }));
-    try {
-      const { data } = await api.get('/reports/channel-performance', { params: commonParams() });
-      setChannelReport(data.data ?? data ?? []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading((prev) => ({ ...prev, channels: false }));
-    }
-  };
-
-  const refreshAll = () => {
-    setError(null);
-    fetchSummary();
+  useEffect(() => {
     fetchTrend();
-    fetchStock();
-    fetchProductSales();
-    fetchChannelPerformance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesFilters.from, salesFilters.to, salesFilters.status, salesFilters.channel, trendInterval]);
+
+  const fetchHistory = async () => {
+    setError(null);
+    setLoading((prev) => ({ ...prev, history: true }));
+    try {
+      const { data } = await api.get('/reports/stock-history', {
+        params: {
+          start_date: historyFilters.from || undefined,
+          end_date: historyFilters.to || undefined,
+          interval: historyFilters.interval || undefined,
+        },
+      });
+      setHistoryData(data.data ?? data ?? { products: [], segments: [] });
+    } catch (err) {
+      setError(err.message || 'Gagal memuat riwayat stok');
+    } finally {
+      setLoading((prev) => ({ ...prev, history: false }));
+    }
   };
 
   useEffect(() => {
-    refreshAll();
+    fetchHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.from, filters.to, filters.interval]);
-
-  useEffect(() => {
-    fetchProductSales();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productSearch]);
-
-  const groupedStock = useMemo(() => {
-    return stock
-      .map((row) => ({
-        productName: row.nama_produk,
-        sku: row.sku,
-        ready: row.qty_remaining ?? row.stok_available ?? 0,
-        reserved: row.reserved_qty ?? row.stok_reserved ?? 0,
-        total: row.qty_initial ?? row.stok ?? (row.qty_remaining ?? 0),
-      }))
-      .sort((a, b) => (b.ready ?? 0) - (a.ready ?? 0));
-  }, [stock]);
-
-  const renderTrend = () => {
-    if (loading.trend) return <p className="text-sm text-slate-500">Memuat grafik...</p>;
-    if (!trend.length) return <p className="text-sm text-slate-500">Belum ada data tren.</p>;
-
-    const maxRevenue = Math.max(...trend.map((item) => Number(item.revenue) || 0)) || 1;
-
-    return (
-      <div className="flex items-end gap-3 h-48">
-        {trend.map((point) => {
-          const barHeight = ((Number(point.revenue) || 0) / maxRevenue) * 100;
-          return (
-            <div key={point.label} className="flex-1 flex flex-col items-center">
-              <div
-                className="w-full rounded-t-lg bg-gradient-to-t from-brand-red to-[#ff707e]"
-                style={{ height: `${barHeight}%` }}
-              />
-              <p className="text-xs text-slate-500 mt-2 text-center">{point.label}</p>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const handleExport = () => {
-    const params = new URLSearchParams({
-      from: filters.from || '',
-      to: filters.to || '',
-      search: productSearch || '',
-    });
-    const base = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api';
-    window.open(`${base}/reports/export/product-sales?${params.toString()}`, '_blank');
-  };
+  }, [historyFilters.from, historyFilters.to, historyFilters.interval]);
 
   const renderPagination = (meta, onChange, disabled) => {
     if (!meta) return null;
@@ -204,298 +178,406 @@ const AdminReportsPage = () => {
     );
   };
 
-  const printTable = (elementId, title) => {
-    const node = document.getElementById(elementId);
-    if (!node) return;
-    const popup = window.open('', '_blank', 'width=900,height=600');
-    popup.document.write(`
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
-            th { background: #f3f4f6; text-transform: uppercase; letter-spacing: 0.5px; }
-            h1 { margin-bottom: 0; font-size: 18px; }
-            p { margin-top: 4px; color: #6b7280; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <h1>${title}</h1>
-          <p>Periode: ${filters.from || 'Semua'} - ${filters.to || 'Sekarang'}</p>
-          ${node.outerHTML}
-        </body>
-      </html>
-    `);
-    popup.document.close();
-    popup.focus();
-    popup.print();
+  const handleHistoryExport = async () => {
+    try {
+      setLoading((prev) => ({ ...prev, history: true }));
+      const response = await api.get('/reports/export/stock-history', {
+        params: {
+          start_date: historyFilters.from || undefined,
+          end_date: historyFilters.to || undefined,
+          interval: historyFilters.interval || undefined,
+        },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `stock-history-${historyFilters.from || 'all'}-${historyFilters.to || 'now'}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || 'Gagal mengunduh CSV riwayat stok');
+    } finally {
+      setLoading((prev) => ({ ...prev, history: false }));
+    }
   };
 
-  const summary = summaryData?.summary ?? {};
-  const topProducts = summaryData?.top_products ?? [];
-  const lowStocks = summaryData?.low_stock_batches ?? [];
+  const renderTrendChart = () => {
+    if (loading.trend) {
+      return <p className="text-sm text-slate-500">Memuat grafik penjualan...</p>;
+    }
+
+    if (!trendData.length) {
+      return <p className="text-sm text-slate-500">Belum ada data penjualan pada periode ini.</p>;
+    }
+
+    const chartData = trendData.map((item) => ({
+      label: item.label,
+      revenue: Number(item.revenue) || 0,
+      orders: Number(item.orders_count) || 0,
+    }));
+
+    const chartConfig = {
+      revenue: {
+        label: 'Omzet',
+        color: '#D2001A',
+      },
+      orders: {
+        label: 'Jumlah Pesanan',
+        color: '#093FB4',
+      },
+    };
+
+    return (
+      <ChartContainer config={chartConfig} className="h-[400px] w-full">
+        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis
+            dataKey="label"
+            angle={-45}
+            textAnchor="end"
+            height={80}
+            tick={{ fill: '#64748b', fontSize: 12 }}
+            interval={0}
+          />
+          <YAxis
+            yAxisId="left"
+            tick={{ fill: '#64748b', fontSize: 12 }}
+            tickFormatter={(value) => `Rp ${(value / 1000).toFixed(0)}k`}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={{ fill: '#64748b', fontSize: 12 }}
+          />
+          <ChartTooltip
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              return (
+                <ChartTooltipContent
+                  active={active}
+                  payload={payload}
+                  formatter={(value, name) => {
+                    if (name === 'revenue') {
+                      return [formatCurrency(value), 'Omzet'];
+                    }
+                    return [formatNumber(value) + ' pesanan', 'Jumlah Pesanan'];
+                  }}
+                />
+              );
+            }}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="revenue"
+            fill="#D2001A"
+            radius={[8, 8, 0, 0]}
+            name="revenue"
+          />
+        </BarChart>
+      </ChartContainer>
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="card space-y-4">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold text-slate-900">Laporan Penjualan & Stok</h1>
+        <p className="text-sm text-slate-500">
+          Fokus pada detail penjualan dan riwayat stok (snapshot per tanggal). Posisi stok real-time bisa dilihat di menu
+          Kelola Produk.
+        </p>
+      </div>
+
+      {error && <div className="p-3 rounded bg-red-50 text-sm text-red-700">{error}</div>}
+
+      {/* Sales Trend */}
+      <section className="card space-y-4">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Laporan & Analitik</h1>
-            <p className="text-sm text-slate-500">Pantau KPI penjualan, channel, dan kesehatan stok.</p>
+            <p className="text-base font-semibold text-slate-900">Grafik Tren Penjualan</p>
+            <p className="text-sm text-slate-500">
+              Monitor omzet dan jumlah pesanan secara cepat berdasarkan rentang tanggal yang sama seperti tabel detail.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <div>
+              <label className="text-xs text-slate-500">Interval</label>
+              <select
+                className="input-field"
+                value={trendInterval}
+                onChange={(e) => setTrendInterval(e.target.value)}
+              >
+                {TREND_INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </header>
+        {renderTrendChart()}
+      </section>
+
+      {/* Sales Detail Report */}
+      <section className="card space-y-4">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-base font-semibold text-slate-900">Laporan Penjualan Detail</p>
+            <p className="text-sm text-slate-500">Tampilkan nama customer, tanggal, produk yang dibeli dan kode produknya.</p>
           </div>
           <div className="grid gap-3 w-full sm:grid-cols-2 lg:grid-cols-4 lg:w-auto">
             <div>
               <label className="text-xs text-slate-500">Dari</label>
               <input
-                className="input-field"
                 type="date"
-                value={filters.from}
-                onChange={(e) => setFilters((prev) => ({ ...prev, from: e.target.value }))}
+                className="input-field"
+                value={salesFilters.from}
+                onChange={(e) => setSalesFilters((prev) => ({ ...prev, from: e.target.value }))}
               />
             </div>
             <div>
               <label className="text-xs text-slate-500">Sampai</label>
               <input
-                className="input-field"
                 type="date"
-                value={filters.to}
-                onChange={(e) => setFilters((prev) => ({ ...prev, to: e.target.value }))}
+                className="input-field"
+                value={salesFilters.to}
+                onChange={(e) => setSalesFilters((prev) => ({ ...prev, to: e.target.value }))}
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500">Interval Tren</label>
+              <label className="text-xs text-slate-500">Status</label>
               <select
                 className="input-field"
-                value={filters.interval}
-                onChange={(e) => setFilters((prev) => ({ ...prev, interval: e.target.value }))}
+                value={salesFilters.status}
+                onChange={(e) => setSalesFilters((prev) => ({ ...prev, status: e.target.value }))}
               >
-                <option value="daily">Harian</option>
-                <option value="weekly">Mingguan</option>
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
-            <button type="button" className="btn-primary self-end" onClick={refreshAll}>
-              Refresh
-            </button>
-          </div>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {KPI_CARDS.map(({ key, label }) => (
-          <div key={key} className="card">
-            <p className="text-xs uppercase text-slate-500">{label}</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">
-              {key.includes('revenue') ? formatCurrency(summary[key]) : formatNumber(summary[key])}
-            </p>
-            {loading.summary && <p className="text-xs text-slate-400 mt-1">Memuat...</p>}
-          </div>
-        ))}
-      </div>
-
-      <div className="card space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="font-semibold text-slate-900">
-            Tren Penjualan ({filters.interval === 'daily' ? 'Harian' : 'Mingguan'})
-          </p>
-          <p className="text-xs text-slate-500">Total titik: {trend.length}</p>
-        </div>
-        {renderTrend()}
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold text-slate-900">Top Produk</p>
-            <span className="text-xs text-slate-500">Top 5</span>
-          </div>
-          {topProducts.length === 0 ? (
-            <p className="text-sm text-slate-500">Belum ada data penjualan.</p>
-          ) : (
-            <div className="space-y-3">
-              {topProducts.map((item) => (
-                <div key={item.product_id} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-semibold text-slate-900">{item.nama_produk}</p>
-                    <p className="text-xs text-slate-500">SKU {item.sku}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-slate-900">{formatNumber(item.qty_sold)} pcs</p>
-                    <p className="text-xs text-slate-500">{formatCurrency(item.revenue)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold text-slate-900">Stok Kritis</p>
-            <span className="text-xs text-slate-500">Produk prioritas</span>
-          </div>
-          {lowStocks.length === 0 ? (
-            <p className="text-sm text-slate-500">Belum ada produk dengan stok kritis.</p>
-          ) : (
-            <div className="space-y-3">
-              {lowStocks.map((product) => (
-                <div key={`${product.product_id}-${product.sku || 'sku'}`} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-semibold text-slate-900">{product.nama_produk}</p>
-                    <p className="text-xs text-slate-500">SKU {product.sku || '-'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-red-600">{formatNumber(product.available)} pcs</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="card space-y-4">
-        <div className="flex flex-wrap gap-3 border-b border-slate-100 pb-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-semibold ${
-                activeTab === tab.id ? 'text-brand-red border-b-2 border-brand-red' : 'text-slate-500'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === 'stock' && (
-          <div className="space-y-4">
-            {loading.stock ? (
-              <p className="text-sm text-slate-500">Memuat data stok...</p>
-            ) : groupedStock.length === 0 ? (
-              <p className="text-sm text-slate-500">Tidak ada data stok untuk periode ini.</p>
-            ) : (
-              <div className="grid gap-4">
-                {groupedStock.map((product, idx) => (
-                  <div
-                    key={`${product.productName}-${product.sku || idx}`}
-                    className="rounded-xl border border-slate-100 p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold text-slate-900">{product.productName || '-'}</p>
-                      {product.sku && <p className="text-xs text-slate-500">SKU {product.sku}</p>}
-                    </div>
-                    <div className="flex gap-6 text-sm">
-                      <div>
-                        <p className="text-slate-500">Ready</p>
-                        <p className="text-lg font-bold text-slate-900">{formatNumber(product.ready)} pcs</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Reserved</p>
-                        <p className="text-lg font-bold text-orange-600">{formatNumber(product.reserved)} pcs</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Total</p>
-                        <p className="text-lg font-bold text-slate-900">{formatNumber(product.total)} pcs</p>
-                      </div>
-                    </div>
-                  </div>
+            <div>
+              <label className="text-xs text-slate-500">Channel</label>
+              <select
+                className="input-field"
+                value={salesFilters.channel}
+                onChange={(e) => setSalesFilters((prev) => ({ ...prev, channel: e.target.value }))}
+              >
+                {CHANNEL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'products' && (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <input
-                className="input-field md:w-1/3"
-                placeholder="Cari produk atau SKU"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-              />
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="text-sm font-semibold text-brand-red" onClick={handleExport}>
-                  Export CSV
-                </button>
-                <button
-                  type="button"
-                  className="text-sm font-semibold text-brand-red/70"
-                  onClick={() => printTable('product-report-table', 'Laporan Penjualan Produk')}
-                >
-                  Export PDF
-                </button>
-              </div>
+              </select>
             </div>
-            {loading.products ? (
-              <p className="text-sm text-slate-500">Memuat data produk...</p>
-            ) : productReport.data.length === 0 ? (
-              <p className="text-sm text-slate-500">Tidak ada penjualan dalam periode ini.</p>
-            ) : (
-              <>
-                <div className="overflow-x-auto rounded-lg border border-slate-100">
-                  <table id="product-report-table" className="min-w-full text-sm">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left">Produk</th>
-                        <th className="px-3 py-2 text-left">SKU</th>
-                        <th className="px-3 py-2 text-left">Qty Terjual</th>
-                        <th className="px-3 py-2 text-left">Revenue</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productReport.data.map((row) => (
-                        <tr key={row.product_id} className="border-t border-slate-50">
-                          <td className="px-3 py-2 font-semibold text-slate-900">{row.nama_produk}</td>
-                          <td className="px-3 py-2 text-slate-500">{row.sku}</td>
-                          <td className="px-3 py-2">{formatNumber(row.qty_sold)}</td>
-                          <td className="px-3 py-2">{formatCurrency(row.revenue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {renderPagination(productReport.meta, fetchProductSales, loading.products)}
-              </>
-            )}
           </div>
-        )}
+        </header>
 
-        {activeTab === 'channels' && (
-          <div className="space-y-4">
-            {loading.channels ? (
-              <p className="text-sm text-slate-500">Memuat performa channel...</p>
-            ) : channelReport.length === 0 ? (
-              <p className="text-sm text-slate-500">Belum ada data channel.</p>
-            ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-100">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Channel</th>
-                      <th className="px-3 py-2 text-left">Jumlah Pesanan</th>
-                      <th className="px-3 py-2 text-left">Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {channelReport.map((row, idx) => (
-                      <tr key={`${row.channel || 'unknown'}-${idx}`} className="border-t border-slate-50">
-                        <td className="px-3 py-2 font-semibold text-slate-900">{row.channel || 'online'}</td>
-                        <td className="px-3 py-2">{formatNumber(row.orders_count)}</td>
-                        <td className="px-3 py-2">{formatCurrency(row.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <input
+            className="input-field md:w-1/3"
+            placeholder="Cari nama customer / order / kode external"
+            value={salesFilters.search}
+            onChange={(e) => setSalesFilters((prev) => ({ ...prev, search: e.target.value }))}
+          />
+          <p className="text-xs text-slate-400">
+            Menampilkan {salesData.meta?.from ?? salesData.rows.length} -{' '}
+            {salesData.meta?.to ?? salesData.rows.length} dari {salesData.meta?.total ?? salesData.rows.length} pesanan
+          </p>
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-slate-100">
+          <table className="min-w-full text-sm" id="sales-report-table">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-3 py-2 text-left">Tanggal</th>
+                <th className="px-3 py-2 text-left">Order ID</th>
+                <th className="px-3 py-2 text-left">Customer</th>
+                <th className="px-3 py-2 text-left">Channel</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-left">Produk & Kode</th>
+                <th className="px-3 py-2 text-left">Qty</th>
+                <th className="px-3 py-2 text-left">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading.sales ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-4 text-center text-slate-500">
+                    Memuat data penjualan...
+                  </td>
+                </tr>
+              ) : salesData.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-4 text-center text-slate-500">
+                    Tidak ada penjualan pada periode ini.
+                  </td>
+                </tr>
+              ) : (
+                salesData.rows.map((order) => (
+                  <tr key={order.id} className="border-t border-slate-50 align-top">
+                    <td className="px-3 py-3 text-slate-600">{formatDate(order.ordered_at)}</td>
+                    <td className="px-3 py-3 font-semibold text-slate-900">
+                      {order.external_order_id || `#${order.id}`}
+                    </td>
+                    <td className="px-3 py-3">
+                      <p className="font-semibold text-slate-900">{order.customer_name || '-'}</p>
+                      <p className="text-xs text-slate-500">Total items: {formatNumber(order.total_items)}</p>
+                    </td>
+                    <td className="px-3 py-3 capitalize">{order.channel || '-'}</td>
+                    <td className="px-3 py-3">
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="space-y-2">
+                        {order.items?.map((item, idx) => (
+                          <div key={`${order.id}-${item.product_name}-${idx}`}>
+                            <p className="font-semibold text-slate-900">
+                              {item.product_name}{' '}
+                              {item.product_sku && <span className="text-xs text-slate-500">({item.product_sku})</span>}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {formatNumber(item.qty)} pcs x {formatCurrency(item.unit_price)}
+                            </p>
+                            {item.codes?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {item.codes.map((code) => (
+                                  <span
+                                    key={code}
+                                    className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs"
+                                  >
+                                    {code}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">{formatNumber(order.total_items)} pcs</td>
+                    <td className="px-3 py-3 font-semibold text-slate-900">{formatCurrency(order.total)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {renderPagination(salesData.meta, fetchSales, loading.sales)}
+      </section>
+
+      {/* Stock History Matrix */}
+      <section className="card space-y-4">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-base font-semibold text-slate-900">Riwayat Stok (Mirip Spreadsheet)</p>
+            <p className="text-sm text-slate-500">
+              Pilih periode dan interval untuk melihat stok setiap produk seperti format Excel yang biasa digunakan.
+            </p>
           </div>
-        )}
-      </div>
+          <div className="grid gap-3 w-full sm:grid-cols-2 lg:grid-cols-4 lg:w-auto">
+            <div>
+              <label className="text-xs text-slate-500">Dari</label>
+              <input
+                type="date"
+                className="input-field"
+                value={historyFilters.from}
+                onChange={(e) => setHistoryFilters((prev) => ({ ...prev, from: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">Sampai</label>
+              <input
+                type="date"
+                className="input-field"
+                value={historyFilters.to}
+                onChange={(e) => setHistoryFilters((prev) => ({ ...prev, to: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">Interval</label>
+              <select
+                className="input-field"
+                value={historyFilters.interval}
+                onChange={(e) => setHistoryFilters((prev) => ({ ...prev, interval: e.target.value }))}
+              >
+                {HISTORY_INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="button" className="btn-secondary self-end" onClick={handleHistoryExport}>
+              Download CSV
+            </button>
+          </div>
+        </header>
+
+        <div className="overflow-x-auto rounded-lg border border-slate-100">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-3 py-2 text-left">Tanggal</th>
+                {historyData.products.map((product) => (
+                  <th key={product.id} className="px-3 py-2 text-left whitespace-nowrap">
+                    {product.nama_produk}
+                    {product.sku && <span className="text-xs text-slate-500"> ({product.sku})</span>}
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-left">Terjual</th>
+                <th className="px-3 py-2 text-left">Beli Stock</th>
+                <th className="px-3 py-2 text-left">Total Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading.history ? (
+                <tr>
+                  <td colSpan={historyData.products.length + 4} className="px-3 py-4 text-center text-slate-500">
+                    Memuat riwayat stok...
+                  </td>
+                </tr>
+              ) : historyData.segments.length === 0 ? (
+                <tr>
+                  <td colSpan={historyData.products.length + 4} className="px-3 py-4 text-center text-slate-500">
+                    Tidak ada data riwayat stok untuk periode ini.
+                  </td>
+                </tr>
+              ) : (
+                historyData.segments.map((segment) => (
+                  <tr key={segment.date} className="border-t border-slate-50">
+                    <td className="px-3 py-2 text-slate-600">{formatDate(segment.date)}</td>
+                    {historyData.products.map((product) => (
+                      <td key={`${segment.date}-${product.id}`} className="px-3 py-2">
+                        {formatNumber(segment.products?.[product.id] ?? 0)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-slate-900 font-semibold">
+                      {formatNumber(segment.notes?.sold ?? 0)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-900 font-semibold">
+                      {formatNumber(segment.notes?.restock ?? 0)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-900 font-semibold">
+                      {formatNumber(segment.notes?.total_stock ?? 0)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 };

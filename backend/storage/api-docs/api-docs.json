@@ -11,11 +11,11 @@
     },
     "servers": [
         {
-            "url": "http://localhost:8000/api",
+            "url": "https://0d29d37a82ed.ngrok-free.app/api",
             "description": "API Root"
         },
         {
-            "url": "http://localhost:8000/api"
+            "url": "https://0d29d37a82ed.ngrok-free.app/api"
         }
     ],
     "paths": {
@@ -792,6 +792,64 @@
                 ]
             }
         },
+        "/admin/stock-movements": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Riwayat pergerakan stok",
+                "operationId": "46fcc458530cd5b0b04fd783b8b56dc0",
+                "parameters": [
+                    {
+                        "name": "product_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "date_from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "date_to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar pergerakan stok"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/auth/register": {
             "post": {
                 "tags": [
@@ -1545,7 +1603,7 @@
                     "Orders"
                 ],
                 "summary": "Batalkan pesanan",
-                "description": "Membatalkan pesanan dengan status 'belum_dibayar', 'menunggu_konfirmasi', atau 'expired'. Otomatis melepas reservasi/allokasi batch dan mengembalikan stok.",
+                "description": "Membatalkan pesanan dengan status 'belum_dibayar' atau 'menunggu_konfirmasi'. Otomatis melepas reservasi/allokasi batch dan mengembalikan stok. Pesanan yang sudah expired tidak dapat dibatalkan.",
                 "operationId": "f01ac571088d34f82562b3d48911f6f4",
                 "parameters": [
                     {
@@ -1643,6 +1701,9 @@
                     },
                     "404": {
                         "description": "Order tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Order sudah expired/dibatalkan atau tidak dapat menerima bukti pembayaran"
                     }
                 },
                 "security": [
@@ -1909,6 +1970,220 @@
                 "responses": {
                     "200": {
                         "description": "Produk dihapus"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/products/{id}/add-stock": {
+            "post": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Tambah stok produk",
+                "operationId": "9cf3c6aa07f1d5d78fb106bfe773aac2",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "qty"
+                                ],
+                                "properties": {
+                                    "qty": {
+                                        "description": "Jumlah stok yang ditambahkan (bisa negatif untuk mengurangi)",
+                                        "type": "integer",
+                                        "example": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Stok berhasil ditambahkan"
+                    },
+                    "404": {
+                        "description": "Produk tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/reports/stock": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Laporan stok produk",
+                "operationId": "805ecd0c2cc408d5a40a2f21c1875bc0",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar stok produk"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/reports/sales-detail": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Laporan detail penjualan",
+                "operationId": "98fce4d66aa10e000c6a7a5c3aa40e7c",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "channel",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar penjualan detail"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/reports/export/stock-movements": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Ekspor riwayat stok (CSV)",
+                "operationId": "3969fe1a70402281bef75be782ffcf5e",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Format Y-m, misal 2025-08",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "product_ids[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File CSV berisi ringkasan stok"
                     }
                 },
                 "security": [
@@ -2188,6 +2463,10 @@
         {
             "name": "Cart",
             "description": "Cart"
+        },
+        {
+            "name": "Reports",
+            "description": "Reports"
         }
     ],
     "security": [

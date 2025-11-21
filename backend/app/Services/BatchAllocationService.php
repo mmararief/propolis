@@ -76,6 +76,18 @@ class BatchAllocationService
 
             $orderItem->allocated = true;
             $orderItem->save();
+
+            StockMovementService::record(
+                $product,
+                -1 * (int) $orderItem->jumlah,
+                'order_allocation',
+                [
+                    'order_id' => $orderItem->order_id,
+                    'reference_type' => 'order_items',
+                    'reference_id' => $orderItem->id,
+                    'note' => 'Alokasi stok untuk pesanan',
+                ]
+            );
         });
     }
 
@@ -141,7 +153,9 @@ class BatchAllocationService
             ->lockForUpdate()
             ->firstOrFail();
 
-        if ($orderItem->allocated) {
+        $wasAllocated = (bool) $orderItem->allocated;
+
+        if ($wasAllocated) {
             $product->stok += $orderItem->jumlah;
         } else {
             $product->stok_reserved = max(0, $product->stok_reserved - $orderItem->jumlah);
@@ -151,5 +165,19 @@ class BatchAllocationService
 
         $orderItem->allocated = false;
         $orderItem->save();
+
+        if ($wasAllocated) {
+            StockMovementService::record(
+                $product,
+                (int) $orderItem->jumlah,
+                'order_release',
+                [
+                    'order_id' => $orderItem->order_id,
+                    'reference_type' => 'order_items',
+                    'reference_id' => $orderItem->id,
+                    'note' => 'Pengembalian stok dari pembatalan order',
+                ]
+            );
+        }
     }
 }
