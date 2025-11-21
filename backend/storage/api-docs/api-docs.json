@@ -11,11 +11,11 @@
     },
     "servers": [
         {
-            "url": "https://0d29d37a82ed.ngrok-free.app/api",
+            "url": "http://localhost:8000/api",
             "description": "API Root"
         },
         {
-            "url": "https://0d29d37a82ed.ngrok-free.app/api"
+            "url": "http://localhost:8000/api"
         }
     ],
     "paths": {
@@ -2141,6 +2141,68 @@
                 ]
             }
         },
+        "/reports/sales-trend": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Ringkasan tren penjualan",
+                "operationId": "b1a5c1f579ed7874e7fa7f17b2e85573",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "daily",
+                                "weekly"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "channel",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar titik tren"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/reports/export/stock-movements": {
             "get": {
                 "tags": [
@@ -2184,6 +2246,118 @@
                 "responses": {
                     "200": {
                         "description": "File CSV berisi ringkasan stok"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/reports/stock-history": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Riwayat stok per produk per periode",
+                "operationId": "8f5c6b00b68c360ae4e9326b4130c278",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "daily",
+                                "weekly",
+                                "monthly"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "product_ids[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matriks stok per tanggal"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/reports/export/stock-history": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Ekspor riwayat stok seperti spreadsheet (CSV)",
+                "operationId": "8709f26fb6fca837e8d5f60e1488316d",
+                "parameters": [
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "daily",
+                                "weekly",
+                                "monthly"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "product_ids[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File CSV riwayat stok"
                     }
                 },
                 "security": [
