@@ -356,4 +356,55 @@ class ProductController extends Controller
 
         return $this->success(null, 'Produk berhasil dihapus');
     }
+
+    /**
+     * @OA\Get(
+     *     path="/admin/low-stock-products",
+     *     tags={"Products"},
+     *     summary="Daftar produk dengan stok rendah",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(
+     *         name="threshold",
+     *         in="query",
+     *         description="Ambang batas stok tersedia",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\Parameter(
+     *         name="limit",
+     *         in="query",
+     *         description="Jumlah maksimum produk yang dikembalikan (maks 50)",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil memuat produk dengan stok rendah"
+     *     )
+     * )
+     */
+    public function lowStock(Request $request)
+    {
+        $this->authorize('admin');
+
+        $threshold = max(0, (int) $request->integer('threshold', 10));
+        $limit = (int) $request->integer('limit', 10);
+        $limit = $limit > 0 ? min($limit, 50) : 10;
+
+        $availableStockExpression = '(stok - COALESCE(stok_reserved, 0))';
+
+        $products = Product::query()
+            ->select(['id', 'nama_produk', 'sku', 'stok', 'stok_reserved'])
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim((string) $request->input('search'));
+                $query->where(function ($q) use ($search) {
+                    $q->where('nama_produk', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%");
+                });
+            })
+            ->whereRaw("{$availableStockExpression} <= ?", [$threshold])
+            ->orderByRaw("{$availableStockExpression} asc")
+            ->limit($limit)
+            ->get();
+
+        return $this->success($products);
+    }
 }

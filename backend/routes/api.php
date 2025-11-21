@@ -88,4 +88,6 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::get('/reports/export/stock-history', [ReportController::class, 'exportStockHistory']);
 
     Route::get('/admin/stock-movements', [StockMovementController::class, 'index']);
+
+    Route::get('/admin/low-stock-products', [ProductController::class, 'lowStock']);
 });
