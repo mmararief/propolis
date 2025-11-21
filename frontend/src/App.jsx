@@ -23,6 +23,7 @@ import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
 import AdminOrderManualPage from "./pages/admin/AdminOrderManualPage";
 import AdminReportsPage from "./pages/admin/AdminReportsPage";
 import AdminPriceTiersPage from "./pages/admin/AdminPriceTiersPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
 
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -135,15 +136,7 @@ const App = () => (
         <Route path="orders/manual" element={<AdminOrderManualPage />} />
         <Route path="price-tiers" element={<AdminPriceTiersPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
-        <Route
-          path="users"
-          element={
-            <div className="p-6">
-              <h1 className="text-2xl font-bold">Kelola Akun Users</h1>
-              <p className="text-slate-600">Fitur ini akan segera hadir.</p>
-            </div>
-          }
-        />
+        <Route path="users" element={<AdminUsersPage />} />
       </Route>
     </Routes>
   </BrowserRouter>
