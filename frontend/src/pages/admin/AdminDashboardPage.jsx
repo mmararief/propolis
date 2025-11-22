@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
+import { Package, ShoppingCart, Clock, Calendar, DollarSign, AlertTriangle } from 'lucide-react';
 
 const AdminDashboardPage = () => {
   const { user } = useAuth();
@@ -108,32 +109,44 @@ const AdminDashboardPage = () => {
     {
       title: 'Total Produk',
       value: stats.totalProducts,
-      color: 'bg-[#D2001A]',
+      icon: Package,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
     },
     {
       title: 'Total Pesanan',
       value: stats.totalOrders,
-      color: 'bg-[#093FB4]',
+      icon: ShoppingCart,
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50',
     },
     {
       title: 'Pesanan Pending',
       value: stats.pendingOrders,
-      color: 'bg-orange-500',
+      icon: Clock,
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
     },
     {
       title: 'Pesanan Hari Ini',
       value: stats.todayOrders,
-      color: 'bg-green-500',
+      icon: Calendar,
+      color: 'text-green-600',
+      bg: 'bg-green-50',
     },
     {
       title: 'Pendapatan Hari Ini',
       value: formatCurrency(stats.todayRevenue),
-      color: 'bg-purple-500',
+      icon: DollarSign,
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
     },
     {
       title: 'Produk Stok Rendah',
       value: lowStockProducts.length,
-      color: 'bg-red-600',
+      icon: AlertTriangle,
+      color: 'text-red-600',
+      bg: 'bg-red-50',
     },
   ];
 
@@ -162,19 +175,23 @@ const AdminDashboardPage = () => {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {statCards.map((card, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden"
-          >
-            <div className={`${card.color} px-6 py-4`}>
-              <h3 className="text-white text-sm font-medium">{card.title}</h3>
+        {statCards.map((card, index) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={index}
+              className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 flex items-start justify-between"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-500">{card.title}</p>
+                <p className="text-2xl font-bold text-slate-900 mt-2">{card.value}</p>
+              </div>
+              <div className={`p-3 rounded-lg ${card.bg}`}>
+                <Icon className={`w-6 h-6 ${card.color}`} />
+              </div>
             </div>
-            <div className="px-6 py-4 bg-slate-50">
-              <p className="text-2xl font-bold text-slate-900">{card.value}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Low Stock Notifications */}

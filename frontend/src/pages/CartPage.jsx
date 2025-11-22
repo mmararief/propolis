@@ -1,10 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { getProductImageUrl } from '../utils/imageHelper';
-import { getProductPriceTiersSync, getUnitPriceForQuantitySync } from '../utils/pricing';
+import { FaTrash } from 'react-icons/fa';
 
 const CartPage = () => {
-  const { items, updateQty, clearCart, total } = useCart();
+  const { items, updateQty, removeItem, clearCart, total } = useCart();
   const navigate = useNavigate();
 
   const formatPrice = (price) => {
@@ -72,7 +72,7 @@ const CartPage = () => {
         ) : (
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Cart Items Table */}
-            <div className="flex-grow">
+            <div className="grow">
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 {/* Table Header */}
                 <div
@@ -82,30 +82,60 @@ const CartPage = () => {
                   <div className="col-span-1">
                     <input type="checkbox" className="rounded border-gray-300" />
                   </div>
-                  <div className="col-span-5 font-ui font-semibold">Produk</div>
+                  <div className="col-span-4 font-ui font-semibold">Produk</div>
                   <div className="col-span-2 text-center font-ui font-semibold">Harga</div>
                   <div className="col-span-2 text-center font-ui font-semibold">Kuantitas</div>
                   <div className="col-span-2 text-center font-ui font-semibold">Total Harga</div>
+                  <div className="col-span-1 text-center font-ui font-semibold">Aksi</div>
                 </div>
 
                 {/* Cart Items */}
                 {items.map((item) => {
-                  const tiers = getProductPriceTiersSync();
-                  const { tier: activeTier, unitPrice } = getUnitPriceForQuantitySync(item.product, item.qty);
-                  const nextTier = tiers.find((tier) => tier.min_jumlah > item.qty);
-                  const activePrice = unitPrice || item.product.harga_ecer || 250000;
+                  // Calculate price per pack and pack info
+                  let packPrice = 0;
+                  let packSize = 1;
+                  let packQuantity = item.qty; // Default to qty if no pack
+                  
+                  if (item.product_variant_pack?.harga_pack) {
+                    packSize = item.product_variant_pack.pack_size || 1;
+                    packPrice = item.product_variant_pack.harga_pack;
+                    packQuantity = Math.floor(item.qty / packSize); // Jumlah paket
+                  } else if (item.product_variant?.harga_ecer) {
+                    packPrice = item.product_variant.harga_ecer;
+                    packSize = 1;
+                    packQuantity = item.qty;
+                  } else {
+                    packPrice = item.product?.harga_ecer || 250000;
+                    packSize = 1;
+                    packQuantity = item.qty;
+                  }
+
+                  const variantLabel = item.product_variant?.tipe || '';
+                  const packLabel = item.product_variant_pack?.label || '';
+                  const totalPrice = packPrice * packQuantity; // Harga paket × jumlah paket
+
+                  // Handler untuk update quantity (update dalam satuan paket)
+                  const handlePackQuantityChange = (delta) => {
+                    const newPackQty = packQuantity + delta;
+                    if (newPackQty >= 1) {
+                      // Kirim jumlah botol total ke backend
+                      const newQty = newPackQty * packSize;
+                      handleQuantityChange(item.product.id, newQty - item.qty);
+                    }
+                  };
+
                   return (
                   <div
-                    key={item.product.id}
+                    key={`${item.id || item.product.id}-${item.product_variant?.id || ''}-${item.product_variant_pack?.id || ''}`}
                     className="grid grid-cols-12 border-b p-4 items-center hover:bg-gray-50 transition-colors"
                   >
                     <div className="col-span-1">
                       <input type="checkbox" className="rounded border-gray-300" />
                     </div>
-                    <div className="col-span-5">
+                    <div className="col-span-4">
                       <div className="flex gap-4">
                         <div className="w-20 h-20 bg-[#f1f1f1] rounded flex items-center justify-center overflow-hidden relative">
-                          {item.product.gambar ? (
+                          {item.product?.gambar ? (
                             <img
                               src={getProductImageUrl(item.product.gambar)}
                               alt={item.product.nama_produk}
@@ -116,30 +146,22 @@ const CartPage = () => {
                               }}
                             />
                           ) : null}
-                          <span className={`text-xs text-slate-400 ${item.product.gambar ? 'hidden' : ''}`}>Gambar</span>
+                          <span className={`text-xs text-slate-400 ${item.product?.gambar ? 'hidden' : ''}`}>Gambar</span>
                         </div>
                         <div>
                           <h3 className="font-ui font-medium text-gray-900 mb-1">
-                            {item.product.nama_produk}
+                            {item.product?.nama_produk || 'Produk'}
                           </h3>
-                          {tiers.length > 0 && (
-                            <div className="mt-2 text-xs text-slate-500 space-y-1">
-                              {activeTier ? (
+                          {(variantLabel || packLabel) && (
+                            <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+                              {variantLabel && (
                                 <p>
-                                  Harga tingkat aktif:{' '}
-                                  <span className="font-semibold text-slate-900">
-                                    {activeTier.label || `≥ ${activeTier.min_jumlah}${activeTier.max_jumlah ? ` - ${activeTier.max_jumlah}` : ''} pcs`}
-                                  </span>{' '}
-                                  (Rp {Number(activePrice).toLocaleString('id-ID')} / pcs)
+                                  <span className="font-semibold">Varian:</span> {variantLabel}
                                 </p>
-                              ) : (
-                                <p>Harga tingkat berlaku otomatis jika membeli lebih banyak.</p>
                               )}
-                              {nextTier && (
+                              {packLabel && (
                                 <p>
-                                  Tambah {nextTier.min_jumlah - item.qty} pcs lagi untuk harga{' '}
-                                  {nextTier.label || `≥ ${nextTier.min_jumlah} pcs`} (Rp{' '}
-                                  {Number((nextTier.harga_total && nextTier.min_jumlah ? nextTier.harga_total / nextTier.min_jumlah : activePrice)).toLocaleString('id-ID')} / pcs)
+                                  <span className="font-semibold">Paket:</span> {packLabel}
                                 </p>
                               )}
                             </div>
@@ -148,24 +170,24 @@ const CartPage = () => {
                       </div>
                     </div>
                     <div className="col-span-2 text-center font-ui text-gray-900">
-                      {formatPrice(activePrice || 250000)}
+                      {formatPrice(packPrice)}
                     </div>
                     <div className="col-span-2">
                       <div className="flex items-center justify-center space-x-2">
                         <button
-                          onClick={() => handleQuantityChange(item.product.id, -1)}
+                          onClick={() => handlePackQuantityChange(-1)}
                           className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors font-ui font-bold text-gray-700"
                         >
                           -
                         </button>
                         <input
                           type="number"
-                          value={item.qty}
+                          value={packQuantity}
                           readOnly
                           className="w-12 text-center border rounded font-ui font-semibold"
                         />
                         <button
-                          onClick={() => handleQuantityChange(item.product.id, 1)}
+                          onClick={() => handlePackQuantityChange(1)}
                           className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors font-ui font-bold text-gray-700"
                         >
                           +
@@ -176,7 +198,20 @@ const CartPage = () => {
                       className="col-span-2 text-center font-ui font-medium"
                       style={{ color: '#D2001A' }}
                     >
-                      {formatPrice((activePrice || 250000) * item.qty)}
+                      {formatPrice(totalPrice)}
+                    </div>
+                    <div className="col-span-1 text-center">
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Apakah Anda yakin ingin menghapus produk ini dari keranjang?')) {
+                            removeItem(item.id);
+                          }
+                        }}
+                        className="text-red-500 hover:text-red-700 transition-colors p-2 rounded hover:bg-red-50"
+                        title="Hapus produk"
+                      >
+                        <FaTrash className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 );})}
@@ -190,9 +225,6 @@ const CartPage = () => {
                   >
                     Hapus Semua Produk
                   </button>
-                </div>
-                <div className="px-4 py-3 bg-slate-50 text-xs text-slate-500">
-                  * Harga tingkat (reseller/agen) dihitung otomatis berdasarkan jumlah produk ketika checkout.
                 </div>
               </div>
             </div>

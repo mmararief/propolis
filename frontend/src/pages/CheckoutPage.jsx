@@ -4,7 +4,6 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getProductImageUrl } from '../utils/imageHelper';
-import { getProductPriceTiersSync, getUnitPriceForQuantitySync } from '../utils/pricing';
 
 const originCityId = import.meta.env.VITE_ORIGIN_CITY_ID ?? 149;
 
@@ -133,10 +132,21 @@ const CheckoutPage = () => {
         destination_city_id: Number(cityId),
         destination_district_id: Number(districtId),
         destination_subdistrict_id: subdistrictId ? Number(subdistrictId) : undefined,
-        items: items.map((item) => ({
-          product_id: item.product.id,
-          jumlah: item.qty,
-        })),
+        items: items.map((item) => {
+          // Calculate pack_qty if pack exists (jumlah paket yang dibeli)
+          let packQty = null;
+          if (item.product_variant_pack?.pack_size) {
+            packQty = Math.floor(item.qty / item.product_variant_pack.pack_size);
+          }
+          
+          return {
+            product_id: item.product.id,
+            product_variant_id: item.product_variant?.id || null,
+            product_variant_pack_id: item.product_variant_pack?.id || null,
+            pack_qty: packQty, // Jumlah paket (bukan botol)
+            jumlah: item.qty, // Jumlah botol total (untuk validasi)
+          };
+        }),
       };
       const { data } = await api.post('/checkout', payload);
       clearCart();
@@ -154,16 +164,43 @@ const CheckoutPage = () => {
 
   const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
   const grandTotal = total + (form.ongkos_kirim || 0);
+  
+  // Enrich items with pack pricing info
   const enrichedItems = items.map((item) => {
-    const tiers = getProductPriceTiersSync();
-    const { tier: activeTier, unitPrice } = getUnitPriceForQuantitySync(item.product, item.qty);
-    const nextTier = tiers.find((tier) => tier.min_jumlah > item.qty);
+    // Calculate price per pack and pack info
+    let packPrice = 0;
+    let packSize = 1;
+    let packQuantity = item.qty;
+    let unitPrice = 0;
+    
+    if (item.product_variant_pack?.harga_pack) {
+      packSize = item.product_variant_pack.pack_size || 1;
+      packPrice = item.product_variant_pack.harga_pack;
+      packQuantity = Math.floor(item.qty / packSize);
+      unitPrice = packPrice; // Harga per paket
+    } else if (item.product_variant?.harga_ecer) {
+      unitPrice = item.product_variant.harga_ecer;
+      packSize = 1;
+      packQuantity = item.qty;
+    } else {
+      unitPrice = item.product?.harga_ecer || 250000;
+      packSize = 1;
+      packQuantity = item.qty;
+    }
+    
+    const variantLabel = item.product_variant?.tipe || '';
+    const packLabel = item.product_variant_pack?.label || '';
+    const totalPrice = unitPrice * packQuantity;
+    
     return {
       ...item,
-      tiers,
-      activeTier,
-      unitPrice: unitPrice || item.product.harga_ecer || 250000,
-      nextTier,
+      packPrice,
+      packSize,
+      packQuantity,
+      unitPrice,
+      totalPrice,
+      variantLabel,
+      packLabel,
     };
   });
 
@@ -320,6 +357,20 @@ const CheckoutPage = () => {
                                 <h3 className="font-ui font-medium text-gray-900">
                                   {item.product.nama_produk}
                                 </h3>
+                                {(item.variantLabel || item.packLabel) && (
+                                  <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+                                    {item.variantLabel && (
+                                      <p>
+                                        <span className="font-semibold">Varian:</span> {item.variantLabel}
+                                      </p>
+                                    )}
+                                    {item.packLabel && (
+                                      <p>
+                                        <span className="font-semibold">Paket:</span> {item.packLabel}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -327,17 +378,23 @@ const CheckoutPage = () => {
                             <span className="font-ui font-medium text-gray-900">
                               {formatPrice(item.unitPrice || 250000)}
                             </span>
+                            {item.packSize > 1 && (
+                              <p className="text-xs text-gray-500 mt-1">per paket</p>
+                            )}
                           </td>
                           <td className="text-center py-4">
                             <span className="font-ui font-medium text-gray-900">
-                              {item.qty}
+                              {item.packQuantity > 0 ? item.packQuantity : item.qty}
                             </span>
+                            {item.packSize > 1 && (
+                              <p className="text-xs text-gray-500 mt-1">paket</p>
+                            )}
                           </td>
                           <td className="text-right py-4">
                             <span
                               className="font-ui font-semibold text-gray-900"
                             >
-                              {formatPrice((item.unitPrice || 250000) * item.qty)}
+                              {formatPrice(item.totalPrice || (item.unitPrice || 250000) * (item.packQuantity || item.qty))}
                             </span>
                           </td>
                         </tr>

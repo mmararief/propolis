@@ -14,6 +14,7 @@ class Product extends Model
         'kategori_id',
         'sku',
         'nama_produk',
+        'tipe',
         'deskripsi',
         'harga_ecer',
         'stok',
@@ -36,6 +37,31 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class, 'kategori_id');
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function activeVariants()
+    {
+        return $this->hasMany(ProductVariant::class)->where('status', 'aktif');
+    }
+
+    /**
+     * Packs langsung dari produk (tanpa variant)
+     */
+    public function packs()
+    {
+        return $this->hasMany(ProductVariantPack::class, 'product_id')->whereNull('product_variant_id');
+    }
+
+    public function activePacks()
+    {
+        return $this->hasMany(ProductVariantPack::class, 'product_id')
+            ->whereNull('product_variant_id')
+            ->where('status', 'aktif');
     }
 
     /**
@@ -64,6 +90,38 @@ class Product extends Model
 
     public function getStokAvailableAttribute(): int
     {
+        // Cek apakah produk punya variants
+        // Jika variants sudah di-load, cek apakah tidak kosong
+        if ($this->relationLoaded('variants')) {
+            // Jika variants kosong, cek apakah ada direct packs
+            if ($this->variants->isEmpty()) {
+                // Jika ada direct packs, stok pack dihitung dari stok produk
+                // Tapi stok produk tetap dikembalikan sebagai stok_available
+                // (karena pack menggunakan stok produk, bukan stok pack sendiri)
+                $stok = (int) ($this->attributes['stok'] ?? 0);
+                $reserved = (int) ($this->attributes['stok_reserved'] ?? 0);
+                return max(0, $stok - $reserved);
+            }
+
+            // Jika ada variants, hitung total stok dari semua variants
+            return $this->variants->sum(function ($variant) {
+                // Variant dengan packs: stok pack dihitung dari stok variant
+                // Jadi gunakan stok variant langsung
+                return max(0, ($variant->stok ?? 0) - ($variant->stok_reserved ?? 0));
+            });
+        }
+
+        // Jika variants belum di-load, cek di database
+        if ($this->variants()->exists()) {
+            // Load variants dan hitung stok
+            $this->load('variants');
+            return $this->variants->sum(function ($variant) {
+                return max(0, ($variant->stok ?? 0) - ($variant->stok_reserved ?? 0));
+            });
+        }
+
+        // Jika tidak punya variants, gunakan stok produk langsung
+        // (baik produk dengan direct packs maupun tanpa packs, stok dikelola di level produk)
         $stok = (int) ($this->attributes['stok'] ?? 0);
         $reserved = (int) ($this->attributes['stok_reserved'] ?? 0);
 

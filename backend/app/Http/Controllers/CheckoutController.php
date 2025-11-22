@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\PriceTier;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\ProductVariantPack;
 use App\Services\BatchAllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Annotations as OA;
 
 class CheckoutController extends Controller
@@ -46,8 +48,10 @@ class CheckoutController extends Controller
             'ongkos_kirim' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
-            'items.*.jumlah' => ['required', 'integer', 'min:1'],
-            'items.*.harga_tingkat_id' => ['nullable', 'integer'],
+            'items.*.jumlah' => ['nullable', 'integer', 'min:1'],
+            'items.*.product_variant_id' => ['nullable', 'exists:product_variants,id'],
+            'items.*.product_variant_pack_id' => ['nullable', 'exists:product_variant_packs,id'],
+            'items.*.pack_qty' => ['nullable', 'integer', 'min:1'],
             'items.*.catatan' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -102,11 +106,12 @@ class CheckoutController extends Controller
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $item['product_variant_id'] ?? null,
+                        'product_variant_pack_id' => $item['product_variant_pack_id'] ?? null,
                         'harga_satuan' => $item['harga_satuan'],
                         'jumlah' => $item['jumlah'],
                         'total_harga' => $item['total'],
                         'catatan' => $item['catatan'],
-                        'harga_tingkat_id' => $item['harga_tingkat_id'],
                     ]);
                 }
 
@@ -114,7 +119,7 @@ class CheckoutController extends Controller
 
                 $this->allocationService->reserveForOrder($order);
 
-                return $order->fresh(['items.product', 'items.productCodes']);
+                return $order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']);
             });
         } catch (InsufficientStockException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -133,43 +138,82 @@ class CheckoutController extends Controller
         foreach ($items as $payload) {
             /** @var Product $product */
             $product = Product::findOrFail($payload['product_id']);
-            $qty = (int) $payload['jumlah'];
-            $tier = null;
+            $variant = null;
+            $pack = null;
 
-            // If a specific tier ID is provided, check global tiers
-            if (! empty($payload['harga_tingkat_id'])) {
-                $tier = PriceTier::global()
-                    ->where('id', $payload['harga_tingkat_id'])
-                    ->first();
+            if (! empty($payload['product_variant_id'])) {
+                $variant = ProductVariant::where('product_id', $product->id)
+                    ->findOrFail($payload['product_variant_id']);
             }
 
-            // If no tier found yet, find matching global tier based on quantity
-            if (! $tier) {
-                $tier = PriceTier::global()
-                    ->where('min_jumlah', '<=', $qty)
-                    ->where(function ($query) use ($qty) {
-                        $query->whereNull('max_jumlah')
-                            ->orWhere('max_jumlah', '>=', $qty);
-                    })
-                    ->orderByDesc('min_jumlah')
-                    ->first();
+            if (! empty($payload['product_variant_pack_id'])) {
+                $pack = ProductVariantPack::findOrFail($payload['product_variant_pack_id']);
+
+                // Jika pack dari variant
+                if ($pack->product_variant_id) {
+                    if ($variant && $pack->product_variant_id !== $variant->id) {
+                        throw ValidationException::withMessages([
+                            'items' => ['Varian jumlah tidak sesuai dengan varian produk.'],
+                        ]);
+                    }
+
+                    // Jika variant belum di-load, load dari pack
+                    if (! $variant) {
+                        $variant = ProductVariant::findOrFail($pack->product_variant_id);
+
+                        if ($variant->product_id !== $product->id) {
+                            throw ValidationException::withMessages([
+                                'items' => ['Varian jumlah tidak sesuai dengan produk yang dipilih.'],
+                            ]);
+                        }
+                    }
+                } else {
+                    // Pack langsung dari produk (tanpa variant)
+                    // Pastikan pack sesuai dengan produk
+                    if ($pack->product_id !== $product->id) {
+                        throw ValidationException::withMessages([
+                            'items' => ['Paket tidak sesuai dengan produk yang dipilih.'],
+                        ]);
+                    }
+                }
             }
 
-            // harga_total adalah total harga untuk min_jumlah item, jadi hitung harga per item
-            if ($tier) {
-                $hargaSatuan = $tier->harga_total / $tier->min_jumlah;
+            // Validasi variant jika ada
+            if ($variant && $variant->product_id !== $product->id) {
+                throw ValidationException::withMessages([
+                    'items' => ['Varian yang dipilih tidak sesuai dengan produk.'],
+                ]);
+            }
+
+            if ($pack) {
+                // Gunakan harga dari pack
+                $packQty = max(1, (int) ($payload['pack_qty'] ?? 1));
+                $qty = $pack->pack_size * $packQty;
+                $packHarga = $pack->harga_pack ?? ($variant?->getEffectivePrice() ?? $product->harga_ecer) * $pack->pack_size;
+                $total = $packHarga * $packQty;
+                $hargaSatuan = $total / $qty;
             } else {
-                $hargaSatuan = $product->harga_ecer;
+                // Gunakan harga dari variant (atau product jika tidak ada variant)
+                $qty = (int) ($payload['jumlah'] ?? 0);
+
+                if ($qty <= 0) {
+                    throw ValidationException::withMessages([
+                        'items' => ['Jumlah produk harus lebih dari 0.'],
+                    ]);
+                }
+
+                $hargaSatuan = $variant?->getEffectivePrice() ?? $product->harga_ecer;
+                $total = $hargaSatuan * $qty;
             }
-            $total = $hargaSatuan * $qty;
 
             $result['items'][] = [
                 'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
+                'product_variant_pack_id' => $pack?->id,
                 'harga_satuan' => $hargaSatuan,
                 'jumlah' => $qty,
                 'total' => $total,
                 'catatan' => $payload['catatan'] ?? null,
-                'harga_tingkat_id' => $tier?->id,
             ];
 
             $result['subtotal'] += $total;
