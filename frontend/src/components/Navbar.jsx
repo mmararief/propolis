@@ -22,28 +22,45 @@ const Navbar = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 w-full h-[100px] bg-white z-50">
-      <div className="relative w-full h-full max-w-[1600px] mx-auto px-8 xl:px-[150px]">
-        <div className="flex items-center justify-between h-full">
+    <header className="fixed top-0 left-0 w-full h-[70px] bg-white z-50 shadow-sm">
+      <div className="relative w-full h-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-16">
+        <div className="flex items-center justify-between h-full py-2">
           {/* Brand */}
-          <div className="flex flex-col gap-1">
-            <div className="font-brand text-[40px] leading-none">
-              <span style={{ color: '#D2001A' }}>DANTE</span>
-              <span className="ml-1.5" style={{ color: '#093FB4' }}>PROPOLIS</span>
+          <div className="flex flex-col gap-1 items-end">
+            <div 
+              className="text-[28px] md:text-[32px] leading-none text-right"
+              style={{ fontFamily: "'Racing Sans One', Helvetica, sans-serif" }}
+            >
+              <span style={{ color: '#093FB4' }}>BRITISH </span>
+              <span style={{ color: '#D2001A' }}>PROPOLIS</span>
             </div>
-            <div className="text-[12px] font-ui ml-[100px]">
+            <div className="text-[9px] md:text-[11px] font-ui text-right">
               <span className="text-black">Distributor Resmi </span>
-              <span className="font-brand font-bold" style={{ color: '#093FB4' }}>BRITISH</span>
-              <span className="font-brand font-bold ml-0.5" style={{ color: '#D2001A' }}>PROPOLIS</span>
+              <span 
+                style={{ 
+                  fontFamily: "'Racing Sans One', Helvetica, sans-serif",
+                  color: '#D2001A' 
+                }}
+              >
+                DANTE{' '}
+              </span>
+              <span 
+                style={{ 
+                  fontFamily: "'Racing Sans One', Helvetica, sans-serif",
+                  color: '#093FB4' 
+                }}
+              >
+                PROPOLIS
+              </span>
             </div>
           </div>
 
           {/* Navigation Items - Desktop */}
-          <nav className="hidden lg:flex items-center gap-6 xl:gap-8">
+          <nav className="hidden lg:flex items-center gap-3 xl:gap-5">
             <NavLink
               to="/"
               className={({ isActive }) =>
-                `font-ui font-bold text-[20px] h-10 flex items-center hover:opacity-80 ${
+                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${
                   isActive ? '' : 'text-black'
                 }`
               }
@@ -56,7 +73,7 @@ const Navbar = () => {
             <NavLink
               to="/about"
               className={({ isActive }) =>
-                `font-ui font-bold text-[20px] h-10 flex items-center hover:opacity-80 ${
+                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${
                   isActive ? '' : 'text-black'
                 }`
               }
@@ -69,7 +86,7 @@ const Navbar = () => {
             <NavLink
               to="/products"
               className={({ isActive }) =>
-                `font-ui font-bold text-[20px] h-10 flex items-center hover:opacity-80 ${
+                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${
                   isActive ? '' : 'text-black'
                 }`
               }
@@ -103,7 +120,7 @@ const Navbar = () => {
                   <img
                     src={cartIcon}
                     alt="Keranjang"
-                    className="w-[50px] h-[50px] object-cover cursor-pointer hover:opacity-80"
+                    className="w-[40px] h-[40px] xl:w-[44px] xl:h-[44px] object-cover cursor-pointer hover:opacity-80 transition-opacity duration-200"
                   />
                   {items.length > 0 && (
                     <span
@@ -117,7 +134,7 @@ const Navbar = () => {
                 <img
                   src={profileIcon}
                   alt="Profil"
-                  className="w-[50px] h-[50px] object-cover cursor-pointer hover:opacity-80"
+                  className="w-[40px] h-[40px] xl:w-[44px] xl:h-[44px] object-cover cursor-pointer hover:opacity-80 transition-opacity duration-200"
                   onClick={() => navigate('/profile')}
                 />
                 {isAdmin && (
@@ -141,14 +158,14 @@ const Navbar = () => {
               <div className="flex items-center gap-3">
                 <Link
                   to="/login"
-                  className="w-[100px] h-10 rounded-[50px] flex items-center justify-center font-ui font-bold text-[20px] text-white hover:opacity-90 transition-opacity"
+                  className="w-[75px] xl:w-[85px] h-7 xl:h-8 rounded-[50px] flex items-center justify-center font-ui font-bold text-[13px] xl:text-[15px] text-white hover:opacity-90 transition-opacity duration-200"
                   style={{ backgroundColor: '#D2001A' }}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="w-[100px] h-10 rounded-[50px] flex items-center justify-center font-ui font-bold text-[20px] text-white hover:opacity-90 transition-opacity"
+                  className="w-[75px] xl:w-[85px] h-7 xl:h-8 rounded-[50px] flex items-center justify-center font-ui font-bold text-[13px] xl:text-[15px] text-white hover:opacity-90 transition-opacity duration-200"
                   style={{ backgroundColor: '#D2001A' }}
                 >
                   Daftar
