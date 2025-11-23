@@ -65,6 +65,17 @@ const AdminOrdersPage = () => {
     }
   };
 
+  const cancelOrder = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin membatalkan pesanan ini? Stok akan dikembalikan.')) return;
+    try {
+      await api.post(`/admin/orders/${id}/cancel`);
+      setMessage(`Order #${id} berhasil dibatalkan`);
+      fetchOrders();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Gagal membatalkan pesanan');
+    }
+  };
+
   const openDetailModal = (orderId) => {
     setSelectedOrderId(orderId);
     setIsDetailModalOpen(true);
@@ -317,6 +328,15 @@ const AdminOrdersPage = () => {
                             onClick={() => markDelivered(order.id)}
                           >
                             Tandai Selesai
+                          </button>
+                        )}
+                        {['belum_dibayar', 'menunggu_konfirmasi', 'diproses'].includes(order.status) && (
+                          <button
+                            type="button"
+                            className="btn-outline px-3 py-1 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                            onClick={() => cancelOrder(order.id)}
+                          >
+                            Batalkan
                           </button>
                         )}
                       </div>

@@ -533,6 +533,48 @@ class AdminOrderController extends Controller
         ], sprintf('Job sync tracking untuk %d order sudah dijalankan', $orders->count()));
     }
 
+    /**
+     * @OA\Post(
+     *     path="/admin/orders/{id}/cancel",
+     *     tags={"Admin"},
+     *     summary="Batalkan pesanan oleh admin",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Pesanan dibatalkan"),
+     *     @OA\Response(response=422, description="Status tidak valid untuk dibatalkan")
+     * )
+     */
+    public function cancel(Request $request, int $orderId)
+    {
+        $this->authorize('admin');
+
+        /** @var Order $order */
+        $order = Order::with(['items'])->findOrFail($orderId);
+
+        $cancellableStatuses = ['belum_dibayar', 'menunggu_konfirmasi', 'diproses'];
+
+        if (! in_array($order->status, $cancellableStatuses)) {
+            return $this->fail('Pesanan dengan status ' . $order->status . ' tidak dapat dibatalkan', 422);
+        }
+
+        // Jika order sudah dialokasikan batch, lepas allokasi (kembalikan qty_remaining)
+        // Jika masih reservasi, lepas reservasi saja
+        if ($order->items->isNotEmpty()) {
+            $hasAllocatedItems = $order->items->some(fn($item) => $item->allocated);
+
+            if ($hasAllocatedItems) {
+                $this->allocationService->releaseAllocation($order);
+            } else {
+                $this->allocationService->releaseReservation($order);
+            }
+        }
+
+        $order->status = 'dibatalkan';
+        $order->save();
+
+        return $this->success($order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']), 'Pesanan berhasil dibatalkan');
+    }
+
     private function syncItemProductCodes($orderItem, array $codes): void
     {
         OrderItemProductCode::where('order_item_id', $orderItem->id)->delete();
