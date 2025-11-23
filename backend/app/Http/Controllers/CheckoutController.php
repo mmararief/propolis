@@ -61,19 +61,19 @@ class CheckoutController extends Controller
             return $this->fail('User harus login untuk checkout', 401);
         }
 
-        $primaryAddress = $user->addresses()->first();
-        $destinationCityId = $data['destination_city_id'] ?? $primaryAddress?->city_id;
-        $destinationDistrictId = $data['destination_district_id'] ?? $primaryAddress?->district_id;
-        $destinationSubdistrictId = $data['destination_subdistrict_id'] ?? $primaryAddress?->subdistrict_id;
-        $addressText = $data['address'] ?? $primaryAddress?->address ?? $user->alamat_lengkap;
-        $phone = $data['phone'] ?? $primaryAddress?->phone ?? $user->no_hp;
+        // Use address data directly from user table
+        $destinationCityId = $data['destination_city_id'] ?? $user->city_id;
+        $destinationDistrictId = $data['destination_district_id'] ?? $user->district_id;
+        $destinationSubdistrictId = $data['destination_subdistrict_id'] ?? $user->subdistrict_id;
+        $addressText = $data['address'] ?? $user->alamat_lengkap;
+        $phone = $data['phone'] ?? $user->no_hp;
 
         if (! $destinationCityId || ! $addressText || ! $phone) {
             return $this->fail('Alamat tujuan belum lengkap. Lengkapi profil/registrasi terlebih dahulu.', 422);
         }
 
         try {
-            $order = DB::transaction(function () use ($user, $data, $destinationCityId, $destinationDistrictId, $destinationSubdistrictId, $addressText, $phone, $primaryAddress) {
+            $order = DB::transaction(function () use ($user, $data, $destinationCityId, $destinationDistrictId, $destinationSubdistrictId, $addressText, $phone) {
                 $pricing = $this->calculatePricing($data['items']);
                 $shippingCost = $data['ongkos_kirim'] ?? 0;
                 $total = $pricing['subtotal'] + $shippingCost;
@@ -87,15 +87,15 @@ class CheckoutController extends Controller
                     'total' => $total,
                     'courier' => $data['courier'] ?? null,
                     'courier_service' => $data['courier_service'] ?? null,
-                    'destination_province_id' => $primaryAddress?->provinsi_id,
-                    'destination_province_name' => $primaryAddress?->provinsi_name,
+                    'destination_province_id' => $user->province_id,
+                    'destination_province_name' => $user->provinsi,
                     'destination_city_id' => $destinationCityId,
-                    'destination_city_name' => $primaryAddress?->city_name,
+                    'destination_city_name' => $user->kabupaten_kota,
                     'destination_district_id' => $destinationDistrictId,
-                    'destination_district_name' => $primaryAddress?->district_name,
+                    'destination_district_name' => $user->kecamatan,
                     'destination_subdistrict_id' => $destinationSubdistrictId,
-                    'destination_subdistrict_name' => $primaryAddress?->subdistrict_name,
-                    'destination_postal_code' => $primaryAddress?->postal_code,
+                    'destination_subdistrict_name' => $user->kelurahan,
+                    'destination_postal_code' => $user->kode_pos,
                     'address' => $addressText,
                     'phone' => $phone,
                     'status' => 'belum_dibayar',

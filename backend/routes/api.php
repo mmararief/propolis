@@ -67,6 +67,7 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::put('/admin/users/{id}', [AdminUserController::class, 'update']);
     Route::delete('/admin/users/{id}', [AdminUserController::class, 'destroy']);
 
+    Route::get('/admin/dashboard/stats', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'index']);
     Route::get('/admin/orders', [AdminOrderController::class, 'index']);
     Route::post('/admin/orders/manual', [AdminOrderController::class, 'storeManual']);
     Route::get('/admin/orders/{id}', [AdminOrderController::class, 'show']);

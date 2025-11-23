@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Address;
+
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -59,7 +59,7 @@ class AdminUserController extends Controller
     {
         $this->authorize('admin');
 
-        $user = User::with(['addresses', 'orders' => function ($q) {
+        $user = User::with(['orders' => function ($q) {
             $q->latest()->limit(10);
         }])->withCount('orders')->findOrFail($id);
 
@@ -128,34 +128,19 @@ class AdminUserController extends Controller
             'password' => Hash::make($data['password']),
             'no_hp' => $data['no_hp'] ?? null,
             'role' => $data['role'] ?? 'pelanggan',
+            'province_id' => $data['province_id'] ?? null,
             'provinsi' => $data['province_name'] ?? null,
+            'city_id' => $data['city_id'] ?? null,
             'kabupaten_kota' => $data['city_name'] ?? null,
+            'district_id' => $data['district_id'] ?? null,
             'kecamatan' => $data['district_name'] ?? null,
+            'subdistrict_id' => $data['subdistrict_id'] ?? null,
             'kelurahan' => $data['subdistrict_name'] ?? null,
             'kode_pos' => $data['postal_code'] ?? null,
             'alamat_lengkap' => $data['alamat_lengkap'] ?? null,
         ]);
 
-        // Buat alamat jika ada data alamat
-        if (isset($data['province_id']) || isset($data['city_id']) || isset($data['alamat_lengkap'])) {
-            Address::create([
-                'user_id' => $user->id,
-                'label' => 'Alamat Utama',
-                'provinsi_id' => $data['province_id'] ?? null,
-                'provinsi_name' => $data['province_name'] ?? null,
-                'city_id' => $data['city_id'] ?? null,
-                'city_name' => $data['city_name'] ?? null,
-                'district_id' => $data['district_id'] ?? null,
-                'district_name' => $data['district_name'] ?? null,
-                'subdistrict_id' => $data['subdistrict_id'] ?? null,
-                'subdistrict_name' => $data['subdistrict_name'] ?? null,
-                'address' => $data['alamat_lengkap'] ?? null,
-                'postal_code' => $data['postal_code'] ?? null,
-                'phone' => $data['no_hp'] ?? null,
-            ]);
-        }
 
-        $user->load('addresses');
 
         return $this->success($user, 'User berhasil dibuat', 201);
     }
@@ -256,69 +241,23 @@ class AdminUserController extends Controller
             $user->kode_pos = $data['postal_code'];
         }
 
-        $user->save();
-
-        // Update atau create address
-        if (isset($data['province_id']) || isset($data['city_id']) || isset($data['district_id']) || isset($data['subdistrict_id'])) {
-            $defaultAddress = $user->addresses()->where('label', 'Alamat Utama')->first();
-
-            if ($defaultAddress) {
-                // Update existing address
-                if (isset($data['province_id'])) {
-                    $defaultAddress->provinsi_id = $data['province_id'];
-                }
-                if (isset($data['province_name'])) {
-                    $defaultAddress->provinsi_name = $data['province_name'];
-                }
-                if (isset($data['city_id'])) {
-                    $defaultAddress->city_id = $data['city_id'];
-                }
-                if (isset($data['city_name'])) {
-                    $defaultAddress->city_name = $data['city_name'];
-                }
-                if (isset($data['district_id'])) {
-                    $defaultAddress->district_id = $data['district_id'];
-                }
-                if (isset($data['district_name'])) {
-                    $defaultAddress->district_name = $data['district_name'];
-                }
-                if (isset($data['subdistrict_id'])) {
-                    $defaultAddress->subdistrict_id = $data['subdistrict_id'];
-                }
-                if (isset($data['subdistrict_name'])) {
-                    $defaultAddress->subdistrict_name = $data['subdistrict_name'];
-                }
-                if (isset($data['postal_code'])) {
-                    $defaultAddress->postal_code = $data['postal_code'];
-                }
-                if (isset($data['alamat_lengkap'])) {
-                    $defaultAddress->address = $data['alamat_lengkap'];
-                }
-                if (isset($data['no_hp'])) {
-                    $defaultAddress->phone = $data['no_hp'];
-                }
-                $defaultAddress->save();
-            } else {
-                // Create new address
-                Address::create([
-                    'user_id' => $user->id,
-                    'label' => 'Alamat Utama',
-                    'provinsi_id' => $data['province_id'] ?? null,
-                    'provinsi_name' => $data['province_name'] ?? null,
-                    'city_id' => $data['city_id'] ?? null,
-                    'city_name' => $data['city_name'] ?? null,
-                    'district_id' => $data['district_id'] ?? null,
-                    'district_name' => $data['district_name'] ?? null,
-                    'subdistrict_id' => $data['subdistrict_id'] ?? null,
-                    'subdistrict_name' => $data['subdistrict_name'] ?? null,
-                    'address' => $data['alamat_lengkap'] ?? null,
-                    'postal_code' => $data['postal_code'] ?? null,
-                    'phone' => $data['no_hp'] ?? $user->no_hp,
-                ]);
-            }
+        // Update new ID columns
+        if (isset($data['province_id'])) {
+            $user->province_id = $data['province_id'];
+        }
+        if (isset($data['city_id'])) {
+            $user->city_id = $data['city_id'];
+        }
+        if (isset($data['district_id'])) {
+            $user->district_id = $data['district_id'];
+        }
+        if (isset($data['subdistrict_id'])) {
+            $user->subdistrict_id = $data['subdistrict_id'];
         }
 
-        $user->load('addresses');
+        $user->save();
+
+
 
         return $this->success($user, 'User berhasil diperbarui');
     }

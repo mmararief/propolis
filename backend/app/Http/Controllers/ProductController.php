@@ -52,6 +52,9 @@ class ProductController extends Controller
 
         if ($request->boolean('include_variants', false)) {
             $products->with(['variants.packs', 'packs']);
+        } else {
+            // Eager load variants for stock calculation if not explicitly requested
+            $products->with(['variants']);
         }
 
         if ($request->filled('status')) {
@@ -64,7 +67,14 @@ class ProductController extends Controller
 
         $perPage = $request->integer('per_page', $request->integer('limit', 15));
 
-        return $this->success($products->paginate($perPage));
+        $result = $products->paginate($perPage);
+
+        // Append stok_available manually to the collection
+        $result->getCollection()->each(function ($product) {
+            $product->append('stok_available');
+        });
+
+        return $this->success($result);
     }
 
     /**
@@ -111,6 +121,7 @@ class ProductController extends Controller
     {
         $product = Product::with(['category', 'variants.packs', 'packs'])->findOrFail($id);
 
+        $product->append('stok_available');
         return $this->success($product);
     }
 
