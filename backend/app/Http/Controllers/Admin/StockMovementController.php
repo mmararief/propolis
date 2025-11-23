@@ -27,7 +27,13 @@ class StockMovementController extends Controller
     {
         $this->authorize('admin');
 
-        $movements = StockMovement::with(['product:id,nama_produk,sku', 'order:id,external_order_id,status', 'user:id,nama_lengkap,email'])
+        $movements = StockMovement::with([
+                'product:id,nama_produk,sku',
+                'productVariant:id,tipe,sku_variant',
+                'productVariantPack:id,label,pack_size',
+                'order:id,external_order_id,status',
+                'user:id,nama_lengkap,email'
+            ])
             ->when($request->filled('product_id'), fn($query) => $query->where('product_id', $request->integer('product_id')))
             ->when($request->filled('type'), fn($query) => $query->where('type', $request->string('type')))
             ->when($request->filled('date_from'), fn($query) => $query->whereDate('created_at', '>=', $request->date('date_from')))

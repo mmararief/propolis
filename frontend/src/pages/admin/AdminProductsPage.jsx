@@ -12,6 +12,7 @@ const AdminProductsPage = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [stockQty, setStockQty] = useState('');
   const [stockLoading, setStockLoading] = useState(false);
+  const formatCurrency = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
   useEffect(() => {
     fetchProducts();
@@ -20,7 +21,13 @@ const AdminProductsPage = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/products');
+      const { data } = await api.get('/products', {
+        params: {
+          include_variants: 1,
+          per_page: 100,
+        },
+      });
+      // Backend sudah include packs jika include_variants = true
       setProducts(data.data?.data ?? data.data ?? []);
     } catch (err) {
       setError(err.message);
@@ -43,6 +50,19 @@ const AdminProductsPage = () => {
   };
 
   const handleOpenStockModal = (product) => {
+    // Jika produk punya variant atau pack, stok harus dikelola di level variant/pack
+    const hasVariants = product.variants && product.variants.length > 0;
+    const hasPacks = product.packs && product.packs.length > 0;
+
+    if (hasVariants || hasPacks) {
+      const message = hasVariants
+        ? 'Produk ini memiliki varian. Stok harus dikelola melalui varian/paket. Buka halaman edit produk?'
+        : 'Produk ini memiliki paketan. Stok dikelola di level produk dan digunakan untuk semua paketan. Buka halaman edit produk?';
+      if (window.confirm(message)) {
+        navigate(`/admin/products/${product.id}/edit`);
+      }
+      return;
+    }
     setSelectedProduct(product);
     setStockQty('');
     setShowStockModal(true);
@@ -140,28 +160,32 @@ const AdminProductsPage = () => {
                   {products.map((product) => (
                     <tr key={product.id} className="border-b border-slate-50 hover:bg-slate-50">
                       <td className="py-3">
-                        {product.gambar ? (
-                          <img
-                            src={getProductImageUrl(product.gambar)}
-                            alt={product.nama_produk}
-                            className="w-16 h-16 object-cover rounded border border-slate-200"
-                            onError={(e) => {
-                              e.target.src = 'https://via.placeholder.com/64?text=No+Image';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-xs text-slate-400">
-                            No Image
-                          </div>
-                        )}
+                        {(() => {
+                          const imageSource = Array.isArray(product.gambar)
+                            ? product.gambar[0]
+                            : product.gambar;
+                          if (imageSource) {
+                            return (
+                              <img
+                                src={getProductImageUrl(imageSource)}
+                                alt={product.nama_produk}
+                                className="w-16 h-16 object-cover rounded border border-slate-200"
+                                onError={(e) => {
+                                  e.target.src = 'https://via.placeholder.com/64?text=No+Image';
+                                }}
+                              />
+                            );
+                          }
+                          return (
+                            <div className="w-16 h-16 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-xs text-slate-400">
+                              No Image
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="py-3">
                         <div className="font-medium text-slate-900">{product.nama_produk}</div>
-                        {product.deskripsi && (
-                          <div className="text-xs text-slate-500 mt-1 line-clamp-1">
-                            {product.deskripsi}
-                          </div>
-                        )}
+
                       </td>
                       <td className="py-3 text-slate-600">
                         {product.category?.nama_kategori || '-'}
@@ -169,29 +193,54 @@ const AdminProductsPage = () => {
                       <td className="py-3 text-slate-600 font-mono text-xs">{product.sku}</td>
                       <td className="py-3">
                         <span className="font-semibold text-slate-900">
-                          Rp {Number(product.harga_ecer).toLocaleString('id-ID')}
+                          {formatCurrency(product.harga_ecer)}
                         </span>
                       </td>
                       <td className="py-3">
-                        <div className="text-slate-600 text-sm">
-                          <p>
+                        <div className="text-slate-600 text-sm space-y-1">
+                          <div>
                             Ready:{' '}
                             <span className="font-semibold text-slate-900">
-                              {product.stok_available ?? Math.max(0, (product.stok ?? 0) - (product.stok_reserved ?? 0))}
+                              {product.stok_available ??
+                                Math.max(0, (product.stok ?? 0) - (product.stok_reserved ?? 0))}
                             </span>
-                          </p>
-                          <p className="text-xs text-slate-500">
+                          </div>
+                          <div className="text-xs text-slate-500">
                             Reserved: {product.stok_reserved ?? 0} | Total: {product.stok ?? 0}
-                          </p>
+                          </div>
+                          {product.variants && product.variants.length > 0 && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <p className="text-xs font-semibold text-slate-700 mb-1">Detail Varian:</p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                                {product.variants.map((variant) => (
+                                  <span key={variant.id} className="inline-flex items-center gap-1">
+                                    <span className="font-semibold text-slate-800">{variant.tipe}</span>
+                                    : {variant.stok_available ?? variant.stok ?? 0}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {product.packs && product.packs.length > 0 && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <p className="text-xs font-semibold text-slate-700 mb-1">Paketan:</p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                                {product.packs.map((pack) => (
+                                  <span key={pack.id} className="inline-flex items-center gap-1">
+                                    {pack.label || `${pack.pack_size} Botol`}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="py-3">
                         <span
-                          className={`badge-status ${
-                            product.status === 'aktif'
+                          className={`badge-status ${product.status === 'aktif'
                               ? 'bg-green-100 text-green-700'
                               : 'bg-red-100 text-red-700'
-                          }`}
+                            }`}
                         >
                           {product.status === 'aktif' ? 'Aktif' : 'Nonaktif'}
                         </span>
@@ -207,8 +256,18 @@ const AdminProductsPage = () => {
                           </button>
                           <button
                             type="button"
-                            className="btn-primary px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700"
+                            className={`btn-primary px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 ${(product.variants && product.variants.length > 0) || (product.packs && product.packs.length > 0)
+                                ? 'opacity-60 cursor-not-allowed'
+                                : ''
+                              }`}
                             onClick={() => handleOpenStockModal(product)}
+                            title={
+                              (product.variants && product.variants.length > 0)
+                                ? 'Produk dengan varian: kelola stok melalui halaman Edit'
+                                : (product.packs && product.packs.length > 0)
+                                  ? 'Produk dengan paketan: kelola stok melalui halaman Edit'
+                                  : 'Tambah stok produk'
+                            }
                           >
                             + Stok
                           </button>
@@ -243,6 +302,16 @@ const AdminProductsPage = () => {
             <p className="text-xs text-slate-500 mb-4">
               Stok saat ini: <strong>{selectedProduct.stok ?? 0}</strong>
             </p>
+            {(selectedProduct.variants && selectedProduct.variants.length > 0) || (selectedProduct.packs && selectedProduct.packs.length > 0) ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Perhatian:</strong>{' '}
+                  {selectedProduct.variants && selectedProduct.variants.length > 0
+                    ? 'Produk ini memiliki varian. Stok harus dikelola melalui varian/paket di halaman Edit Produk.'
+                    : 'Produk ini memiliki paketan. Stok dikelola di level produk dan digunakan untuk semua paketan. Buka halaman Edit Produk untuk mengelola stok.'}
+                </p>
+              </div>
+            ) : null}
             <form onSubmit={handleAddStock}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">

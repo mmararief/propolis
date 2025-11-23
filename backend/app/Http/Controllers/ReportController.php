@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -422,21 +423,46 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($history) {
             $handle = fopen('php://output', 'w');
-            $headers = ['Tanggal'];
-            foreach ($history['products'] as $product) {
-                $label = $product['nama_produk'] . ($product['sku'] ? " ({$product['sku']})" : '');
-                $headers[] = trim($label) !== '' ? $label : 'Produk';
+            // Header Row 1: Product Names, CATATAN group, TOTAL STOCK
+            $header1 = ['Tanggal'];
+            $lastProductId = null;
+            foreach ($history['products'] as $item) {
+                if ($lastProductId === $item['product_id']) {
+                    $header1[] = '';
+                } else {
+                    $header1[] = $item['nama_produk'];
+                    $lastProductId = $item['product_id'];
+                }
             }
-            $headers = array_merge($headers, ['Terjual', 'Beli Stock', 'Total Stock']);
-            fputcsv($handle, $headers);
+            // CATATAN covers 2 columns (Terjual, Beli Stock), TOTAL STOCK is separate
+            $header1[] = 'CATATAN';
+            $header1[] = '';
+            $header1[] = 'TOTAL STOCK';
+            fputcsv($handle, $header1);
+
+            // Header Row 2: Variant Names, Specific Columns
+            $header2 = ['']; // Empty under Tanggal (rowSpan)
+            foreach ($history['products'] as $item) {
+                if ($item['type'] === 'variant') {
+                    $label = $item['variant_tipe'] . ($item['sku'] ? " ({$item['sku']})" : '');
+                    $header2[] = $label;
+                } else {
+                    // Product without variant -> Empty (rowSpan)
+                    $header2[] = '';
+                }
+            }
+            $header2[] = 'Terjual';
+            $header2[] = 'Beli Stock';
+            $header2[] = ''; // Empty under Total Stock (rowSpan)
+            fputcsv($handle, $header2);
 
             foreach ($history['segments'] as $segment) {
                 $row = [
                     Carbon::parse($segment['date'])->format('d/m/Y'),
                 ];
 
-                foreach ($history['products'] as $product) {
-                    $row[] = $segment['products'][$product['id']] ?? 0;
+                foreach ($history['products'] as $item) {
+                    $row[] = $segment['products'][$item['id']] ?? 0;
                 }
 
                 $row[] = $segment['notes']['sold'] ?? 0;
@@ -494,7 +520,7 @@ class ReportController extends Controller
             return ['products' => [], 'segments' => []];
         }
 
-        $productQuery = Product::query()->orderBy('nama_produk');
+        $productQuery = Product::with('variants')->orderBy('nama_produk');
         if (! empty($productIds)) {
             $productQuery->whereIn('id', $productIds);
         }
@@ -504,24 +530,67 @@ class ReportController extends Controller
             return ['products' => [], 'segments' => []];
         }
 
+        // Build items list: products without variants + variants
+        $items = [];
+        foreach ($products as $product) {
+            if ($product->variants->isEmpty()) {
+                // Product without variants
+                $items[] = [
+                    'id' => 'product_' . $product->id,
+                    'product_id' => $product->id,
+                    'variant_id' => null,
+                    'nama_produk' => $product->nama_produk,
+                    'sku' => $product->sku,
+                    'type' => 'product',
+                ];
+            } else {
+                // Product with variants - add each variant
+                foreach ($product->variants as $variant) {
+                    $items[] = [
+                        'id' => 'variant_' . $variant->id,
+                        'product_id' => $product->id,
+                        'variant_id' => $variant->id,
+                        'nama_produk' => $product->nama_produk,
+                        'variant_tipe' => $variant->tipe,
+                        'sku' => $variant->sku_variant ?? $product->sku,
+                        'type' => 'variant',
+                    ];
+                }
+            }
+        }
+
         $firstStart = $segments[0]['start'];
         $lastEnd = $segments[array_key_last($segments)]['end'];
 
-        $openingBalances = StockMovement::query()
+        // Calculate opening balances for products (without variants)
+        $productOpeningBalances = StockMovement::query()
             ->select('product_id')
             ->selectRaw('SUM(change_qty) as opening_stock')
             ->where('created_at', '<', $firstStart)
+            ->whereNull('product_variant_id')
             ->when(! empty($productIds), fn($q) => $q->whereIn('product_id', $productIds))
             ->groupBy('product_id')
             ->pluck('opening_stock', 'product_id');
 
-        $dailyMovements = StockMovement::query()
+        // Calculate opening balances for variants
+        $variantOpeningBalances = StockMovement::query()
+            ->select('product_variant_id')
+            ->selectRaw('SUM(change_qty) as opening_stock')
+            ->where('created_at', '<', $firstStart)
+            ->whereNotNull('product_variant_id')
+            ->when(! empty($productIds), fn($q) => $q->whereIn('product_id', $productIds))
+            ->groupBy('product_variant_id')
+            ->pluck('opening_stock', 'product_variant_id');
+
+        // Get daily movements for products (without variants)
+        $productDailyMovements = StockMovement::query()
             ->select('product_id')
             ->selectRaw('DATE(created_at) as movement_date')
             ->selectRaw('SUM(change_qty) as net_change')
             ->selectRaw('SUM(CASE WHEN change_qty > 0 THEN change_qty ELSE 0 END) as stock_in')
             ->selectRaw('SUM(CASE WHEN change_qty < 0 THEN ABS(change_qty) ELSE 0 END) as stock_out')
             ->whereBetween('created_at', [$firstStart, $lastEnd])
+            ->whereNull('product_variant_id')
             ->when(! empty($productIds), fn($q) => $q->whereIn('product_id', $productIds))
             ->groupBy('product_id', 'movement_date')
             ->orderBy('product_id')
@@ -539,51 +608,83 @@ class ReportController extends Controller
                 })->values()->all();
             });
 
-        $productStates = [];
+        // Get daily movements for variants
+        $variantDailyMovements = StockMovement::query()
+            ->select('product_variant_id')
+            ->selectRaw('DATE(created_at) as movement_date')
+            ->selectRaw('SUM(change_qty) as net_change')
+            ->selectRaw('SUM(CASE WHEN change_qty > 0 THEN change_qty ELSE 0 END) as stock_in')
+            ->selectRaw('SUM(CASE WHEN change_qty < 0 THEN ABS(change_qty) ELSE 0 END) as stock_out')
+            ->whereBetween('created_at', [$firstStart, $lastEnd])
+            ->whereNotNull('product_variant_id')
+            ->when(! empty($productIds), fn($q) => $q->whereIn('product_id', $productIds))
+            ->groupBy('product_variant_id', 'movement_date')
+            ->orderBy('product_variant_id')
+            ->orderBy('movement_date')
+            ->get()
+            ->groupBy('product_variant_id')
+            ->map(function ($items) {
+                return $items->map(function ($item) {
+                    return [
+                        'date' => Carbon::parse($item->movement_date)->startOfDay(),
+                        'net' => (int) $item->net_change,
+                        'in' => (int) $item->stock_in,
+                        'out' => (int) $item->stock_out,
+                    ];
+                })->values()->all();
+            });
+
+        // Initialize states and pointers
+        $itemStates = [];
         $movementPointers = [];
-        foreach ($products as $product) {
-            $productStates[$product->id] = (int) ($openingBalances[$product->id] ?? 0);
-            $movementPointers[$product->id] = 0;
+        foreach ($items as $item) {
+            $key = $item['id'];
+            if ($item['type'] === 'product') {
+                $itemStates[$key] = (int) ($productOpeningBalances[$item['product_id']] ?? 0);
+            } else {
+                $itemStates[$key] = (int) ($variantOpeningBalances[$item['variant_id']] ?? 0);
+            }
+            $movementPointers[$key] = 0;
         }
 
+        // Build history rows
         $historyRows = [];
         foreach ($segments as $segment) {
-            $rowProducts = [];
+            $rowItems = [];
             $segmentSold = 0;
             $segmentRestock = 0;
 
-            foreach ($products as $product) {
-                $movements = $dailyMovements->get($product->id, []);
-                $pointer = $movementPointers[$product->id];
+            foreach ($items as $item) {
+                $key = $item['id'];
+                $movements = $item['type'] === 'product'
+                    ? $productDailyMovements->get($item['product_id'], [])
+                    : $variantDailyMovements->get($item['variant_id'], []);
+                $pointer = $movementPointers[$key];
 
                 while ($pointer < count($movements) && $movements[$pointer]['date']->lte($segment['end'])) {
-                    $productStates[$product->id] += $movements[$pointer]['net'];
+                    $itemStates[$key] += $movements[$pointer]['net'];
                     $segmentRestock += $movements[$pointer]['in'];
                     $segmentSold += $movements[$pointer]['out'];
                     $pointer++;
                 }
 
-                $movementPointers[$product->id] = $pointer;
-                $rowProducts[$product->id] = $productStates[$product->id];
+                $movementPointers[$key] = $pointer;
+                $rowItems[$key] = $itemStates[$key];
             }
 
             $historyRows[] = [
                 'date' => $segment['label'],
-                'products' => $rowProducts,
+                'products' => $rowItems,
                 'notes' => [
                     'sold' => $segmentSold,
                     'restock' => $segmentRestock,
-                    'total_stock' => array_sum($rowProducts),
+                    'total_stock' => array_sum($rowItems),
                 ],
             ];
         }
 
         return [
-            'products' => $products->map(fn($product) => [
-                'id' => $product->id,
-                'nama_produk' => $product->nama_produk,
-                'sku' => $product->sku,
-            ])->values()->all(),
+            'products' => $items,
             'segments' => $historyRows,
         ];
     }

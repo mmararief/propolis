@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\ProductVariantPackController;
+use App\Http\Controllers\Admin\ProductPackController;
 use App\Http\Controllers\Admin\StockMovementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
@@ -73,6 +75,7 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::post('/admin/orders/{id}/ship', [AdminOrderController::class, 'ship']);
     Route::post('/admin/orders/{id}/mark-delivered', [AdminOrderController::class, 'markDelivered']);
     Route::post('/admin/run-reservation-release', [AdminOrderController::class, 'runReservationRelease']);
+    Route::post('/admin/run-tracking-sync', [AdminOrderController::class, 'runTrackingSync']);
 
     // Global Price Tiers Management
     Route::get('/admin/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'index']);
@@ -90,4 +93,25 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::get('/admin/stock-movements', [StockMovementController::class, 'index']);
 
     Route::get('/admin/low-stock-products', [ProductController::class, 'lowStock']);
+
+    // Product Variants Management
+    Route::get('/admin/products/{productId}/variants', [\App\Http\Controllers\Admin\ProductVariantController::class, 'index']);
+    Route::post('/admin/products/{productId}/variants', [\App\Http\Controllers\Admin\ProductVariantController::class, 'store']);
+    Route::get('/admin/products/{productId}/variants/{id}', [\App\Http\Controllers\Admin\ProductVariantController::class, 'show']);
+    Route::put('/admin/products/{productId}/variants/{id}', [\App\Http\Controllers\Admin\ProductVariantController::class, 'update']);
+    Route::delete('/admin/products/{productId}/variants/{id}', [\App\Http\Controllers\Admin\ProductVariantController::class, 'destroy']);
+    Route::post('/admin/products/{productId}/variants/{id}/add-stock', [\App\Http\Controllers\Admin\ProductVariantController::class, 'addStock']);
+
+    // Product Pack Management (paket langsung dari produk, tanpa variant)
+    Route::get('/admin/products/{productId}/packs', [ProductPackController::class, 'index']);
+    Route::post('/admin/products/{productId}/packs', [ProductPackController::class, 'store']);
+    Route::put('/admin/products/{productId}/packs/{packId}', [ProductPackController::class, 'update']);
+    Route::delete('/admin/products/{productId}/packs/{packId}', [ProductPackController::class, 'destroy']);
+
+    // Variant Pack Management (jumlah per varian)
+    // Catatan: Stok pack dari variant dihitung dari stok variant, tidak memiliki stok sendiri
+    Route::get('/admin/products/{productId}/variants/{variantId}/packs', [ProductVariantPackController::class, 'index']);
+    Route::post('/admin/products/{productId}/variants/{variantId}/packs', [ProductVariantPackController::class, 'store']);
+    Route::put('/admin/products/{productId}/variants/{variantId}/packs/{packId}', [ProductVariantPackController::class, 'update']);
+    Route::delete('/admin/products/{productId}/variants/{variantId}/packs/{packId}', [ProductVariantPackController::class, 'destroy']);
 });

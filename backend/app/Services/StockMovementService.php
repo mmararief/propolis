@@ -20,6 +20,8 @@ class StockMovementService
 
         return StockMovement::create([
             'product_id' => $product->id,
+            'product_variant_id' => $meta['product_variant_id'] ?? null,
+            'product_variant_pack_id' => $meta['product_variant_pack_id'] ?? null,
             'order_id' => $meta['order_id'] ?? null,
             'user_id' => $meta['user_id'] ?? ($meta['actor_id'] ?? auth()->id()),
             'change_qty' => $changeQty,

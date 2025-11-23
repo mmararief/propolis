@@ -6,9 +6,9 @@ use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\Controller;
 use App\Jobs\ReleaseExpiredReservationJob;
 use App\Jobs\SendOrderShippedNotificationJob;
+use App\Jobs\SyncShipmentTrackingJob;
 use App\Models\Order;
 use App\Models\OrderItemProductCode;
-use App\Models\PriceTier;
 use App\Services\BatchAllocationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,7 +35,7 @@ class AdminOrderController extends Controller
     {
         $this->authorize('admin');
 
-        $orders = Order::with(['user', 'items'])
+        $orders = Order::with(['user', 'items.product', 'items.productVariant', 'items.productVariantPack'])
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
             ->orderByDesc('created_at')
             ->paginate($request->integer('per_page', 15));
@@ -93,6 +93,8 @@ class AdminOrderController extends Controller
             'customer.postal_code' => ['nullable', 'string', 'max:10'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.product_variant_id' => ['nullable', 'exists:product_variants,id'],
+            'items.*.product_variant_pack_id' => ['nullable', 'exists:product_variant_packs,id'],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
             'items.*.kode_produk' => ['nullable', 'array'],
@@ -106,6 +108,8 @@ class AdminOrderController extends Controller
         $items = collect($data['items'])->map(function ($item) {
             return [
                 'product_id' => (int) $item['product_id'],
+                'product_variant_id' => !empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : null,
+                'product_variant_pack_id' => !empty($item['product_variant_pack_id']) ? (int) $item['product_variant_pack_id'] : null,
                 'qty' => (int) $item['qty'],
                 'price' => (float) $item['price'],
                 'codes' => collect($item['kode_produk'] ?? [])
@@ -175,15 +179,13 @@ class AdminOrderController extends Controller
                 ]);
 
                 foreach ($items as $item) {
-                    // Tentukan harga tingkat berdasarkan jumlah (qty)
-                    $hargaTingkatId = $this->determinePriceTier($item['product_id'], $item['qty']);
-
                     $orderItem = $order->items()->create([
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $item['product_variant_id'],
+                        'product_variant_pack_id' => $item['product_variant_pack_id'],
                         'jumlah' => $item['qty'],
                         'harga_satuan' => $item['price'],
                         'total_harga' => $item['price'] * $item['qty'],
-                        'harga_tingkat_id' => $hargaTingkatId,
                     ]);
 
                     if (! empty($item['codes'])) {
@@ -195,7 +197,7 @@ class AdminOrderController extends Controller
                     $this->allocationService->allocate($order->id);
                 }
 
-                return $order->fresh(['items.product', 'items.productCodes', 'user']);
+                return $order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes', 'user']);
             });
         } catch (InsufficientStockException $e) {
             return $this->fail($e->getMessage(), 422);
@@ -221,7 +223,7 @@ class AdminOrderController extends Controller
     {
         $this->authorize('admin');
 
-        $order = Order::with(['user', 'items.product', 'items.productCodes'])->findOrFail($id);
+        $order = Order::with(['user', 'items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes'])->findOrFail($id);
 
         return $this->success($order);
     }
@@ -253,7 +255,7 @@ class AdminOrderController extends Controller
             $order->save();
         });
 
-        return $this->success($order->fresh(['items.product', 'items.productCodes']), 'Order verified and allocated');
+        return $this->success($order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']), 'Order verified and allocated');
     }
 
     /**
@@ -362,7 +364,7 @@ class AdminOrderController extends Controller
         });
 
         return $this->success(
-            $order->fresh(['items.product', 'items.productCodes']),
+            $order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']),
             'Kode produk berhasil disimpan'
         );
     }
@@ -415,7 +417,7 @@ class AdminOrderController extends Controller
 
         SendOrderShippedNotificationJob::dispatch($order->id);
 
-        return $this->success($order->fresh(['items.productCodes']), 'Order diperbarui menjadi dikirim');
+        return $this->success($order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']), 'Order diperbarui menjadi dikirim');
     }
 
     /**
@@ -449,7 +451,7 @@ class AdminOrderController extends Controller
         $order->tracking_completed_at = now();
         $order->save();
 
-        return $this->success($order->fresh(['items.productCodes']), 'Order ditandai selesai');
+        return $this->success($order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']), 'Order ditandai selesai');
     }
 
     /**
@@ -470,6 +472,67 @@ class AdminOrderController extends Controller
         return $this->success(null, 'Job release reservasi sudah dijalankan');
     }
 
+    /**
+     * @OA\Post(
+     *     path="/admin/run-tracking-sync",
+     *     tags={"Admin"},
+     *     summary="Trigger sync tracking shipment untuk semua order yang perlu di-update",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer"), description="Maximum orders to sync (default: 50)"),
+     *     @OA\Parameter(name="order_id", in="query", @OA\Schema(type="integer"), description="Sync specific order ID only"),
+     *     @OA\Response(response=200, description="Job sync tracking sudah dijalankan")
+     * )
+     */
+    public function runTrackingSync(Request $request)
+    {
+        $this->authorize('admin');
+
+        $limit = $request->integer('limit', 50);
+        $orderId = $request->integer('order_id');
+
+        // Jika order_id diberikan, sync order tersebut saja
+        if ($orderId) {
+            $order = Order::find($orderId);
+            if (!$order) {
+                return $this->error('Order tidak ditemukan', 404);
+            }
+            if (empty($order->resi)) {
+                return $this->error('Order tidak memiliki nomor resi', 400);
+            }
+
+            SyncShipmentTrackingJob::dispatch($order->id);
+
+            return $this->success(null, 'Job sync tracking untuk order #' . $orderId . ' sudah dijalankan');
+        }
+
+        // Sync semua order yang perlu di-update
+        $intervalHours = (int) config('services.tracking.refresh_interval_hours', 12);
+
+        $orders = Order::query()
+            ->whereNotNull('resi')
+            ->whereIn('status', ['dikirim', 'diproses'])
+            ->where(function ($query) use ($intervalHours) {
+                $query
+                    ->whereNull('tracking_last_checked_at')
+                    ->orWhere('tracking_last_checked_at', '<=', now()->subHours($intervalHours));
+            })
+            ->orderByRaw('COALESCE(tracking_last_checked_at, "1970-01-01") asc')
+            ->limit($limit)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return $this->success(null, 'Tidak ada order yang perlu di-sync tracking');
+        }
+
+        foreach ($orders as $order) {
+            SyncShipmentTrackingJob::dispatch($order->id);
+        }
+
+        return $this->success([
+            'orders_count' => $orders->count(),
+        ], sprintf('Job sync tracking untuk %d order sudah dijalankan', $orders->count()));
+    }
+
     private function syncItemProductCodes($orderItem, array $codes): void
     {
         OrderItemProductCode::where('order_item_id', $orderItem->id)->delete();
@@ -481,24 +544,5 @@ class AdminOrderController extends Controller
                 'sequence' => $index + 1,
             ]);
         }
-    }
-
-    /**
-     * Tentukan harga tingkat berdasarkan jumlah (qty)
-     * Menggunakan logika yang sama dengan CheckoutController
-     */
-    private function determinePriceTier(int $productId, int $qty): ?int
-    {
-        // Cari harga tingkat global yang sesuai dengan jumlah
-        $tier = PriceTier::global()
-            ->where('min_jumlah', '<=', $qty)
-            ->where(function ($query) use ($qty) {
-                $query->whereNull('max_jumlah')
-                    ->orWhere('max_jumlah', '>=', $qty);
-            })
-            ->orderByDesc('min_jumlah')
-            ->first();
-
-        return $tier?->id;
     }
 }

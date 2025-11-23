@@ -24,7 +24,7 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $orders = $request->user()->orders()
-            ->with(['items.product', 'items.productCodes'])
+            ->with(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes'])
             ->orderByDesc('created_at')
             ->paginate(10);
 
@@ -55,7 +55,7 @@ class OrderController extends Controller
             return $this->fail('ID pesanan tidak valid', 422);
         }
 
-        $order = Order::with(['items.product', 'items.productCodes'])->find($id);
+        $order = Order::with(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes'])->find($id);
 
         if (!$order) {
             return $this->fail('Pesanan tidak ditemukan', 404);
@@ -66,7 +66,7 @@ class OrderController extends Controller
         // Cek dan update status jika order sudah expired
         $this->checkAndUpdateExpiredOrder($order);
 
-        return $this->success($order->fresh(['items.product', 'items.productCodes']));
+        return $this->success($order->fresh(['items.product', 'items.productVariant', 'items.productVariantPack', 'items.productCodes']));
     }
 
     /**

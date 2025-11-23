@@ -293,23 +293,69 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                   Daftar Produk & Kode
                 </h3>
                 <div className="space-y-4">
-                  {order.items?.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border border-slate-200 rounded-lg p-4"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-900">
-                            {item.product?.nama_produk || 'Produk tidak ditemukan'}
-                          </h4>
-                          <p className="text-sm text-slate-600">
-                            Qty: {item.jumlah} × Rp{' '}
-                            {Number(item.harga_satuan).toLocaleString('id-ID')} = Rp{' '}
-                            {Number(item.total_harga).toLocaleString('id-ID')}
-                          </p>
+                  {order.items?.map((item) => {
+                    // Calculate pack info if exists
+                    let packQuantity = item.jumlah;
+                    let packPrice = item.harga_satuan || 0;
+                    let totalPrice = item.total_harga || (packPrice * packQuantity);
+                    
+                    if (item.product_variant_pack?.pack_size) {
+                      const packSize = item.product_variant_pack.pack_size;
+                      packQuantity = Math.floor(item.jumlah / packSize);
+                      // If pack has harga_pack, use it; otherwise calculate from harga_satuan
+                      if (item.product_variant_pack.harga_pack) {
+                        packPrice = item.product_variant_pack.harga_pack;
+                        totalPrice = packPrice * packQuantity;
+                      } else {
+                        // Fallback: harga_satuan is already per unit, multiply by pack_size
+                        packPrice = (item.harga_satuan || 0) * packSize;
+                        totalPrice = packPrice * packQuantity;
+                      }
+                    }
+                    
+                    const variantLabel = item.product_variant?.tipe || '';
+                    const packLabel = item.product_variant_pack?.label || '';
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-slate-200 rounded-lg p-4"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-slate-900">
+                              {item.product?.nama_produk || 'Produk tidak ditemukan'}
+                            </h4>
+                            {(variantLabel || packLabel) && (
+                              <div className="mt-1 mb-2 text-xs text-slate-600 space-y-0.5">
+                                {variantLabel && (
+                                  <p>
+                                    <span className="font-semibold">Varian:</span> {variantLabel}
+                                  </p>
+                                )}
+                                {packLabel && (
+                                  <p>
+                                    <span className="font-semibold">Paket:</span> {packLabel}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            <p className="text-sm text-slate-600">
+                              {item.product_variant_pack?.pack_size ? (
+                                <>
+                                  {packQuantity} paket × {item.product_variant_pack.pack_size} botol = {item.jumlah} botol
+                                </>
+                              ) : (
+                                <>Qty: {item.jumlah}</>
+                              )}
+                              {' × Rp '}
+                              {Number(packPrice).toLocaleString('id-ID')}
+                              {item.product_variant_pack?.pack_size && ' (per paket)'}
+                              {' = Rp '}
+                              {Number(totalPrice).toLocaleString('id-ID')}
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
                       <div className="mt-4 pt-3 border-t border-slate-200">
                         <div className="flex items-center justify-between mb-2">
@@ -338,7 +384,8 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                                       )}
                                 </div>
                               </div>
-                            ))}
+                            );
+                          })}
                           </div>
                 {canEditCodes && order.items?.length > 0 && (
                   <div className="flex justify-end mt-4">

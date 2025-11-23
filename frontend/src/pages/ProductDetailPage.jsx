@@ -5,30 +5,66 @@ import { useCart } from '../context/CartContext';
 import cartIcon from '../assets/images/shopping-cart0.png';
 import { SkeletonText, SkeletonButton, SkeletonProductCard } from '../components/Skeleton';
 import { getProductImageUrl } from '../utils/imageHelper';
-import { getProductPriceTiers, fetchGlobalPriceTiers } from '../utils/pricing';
+import { FaCheckCircle } from 'react-icons/fa';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
-  const [priceTiers, setPriceTiers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { addItem, clearCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [baseQuantity, setBaseQuantity] = useState(3); // Jumlah dasar (1, 3, atau 5)
+  const [multiplier, setMultiplier] = useState(1); // Berapa kali (x1, x2, x3, dll)
+  const [showToast, setShowToast] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
       setLoading(true);
       try {
-        const [productResponse, tiers] = await Promise.all([
-          api.get(`/products/${id}`),
-          fetchGlobalPriceTiers()
-        ]);
-        setProduct(productResponse.data.data);
-        setPriceTiers(tiers || []);
+        const productResponse = await api.get(`/products/${id}`);
+        const productData = productResponse.data.data;
+        setProduct(productData);
+        
+        // Set default variant jika produk punya variants
+        if (productData.variants && productData.variants.length > 0) {
+          // Pilih varian pertama yang aktif dan punya stok
+          const availableVariant = productData.variants.find(
+            (v) => v.status === 'aktif' && (v.stok_available || v.stok - v.stok_reserved) > 0
+          ) || productData.variants[0];
+          setSelectedVariant(availableVariant);
+          
+          // Set default baseQuantity dari pack pertama yang tersedia
+          const availablePacks = (availableVariant.packs || []).filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+          if (availablePacks.length > 0) {
+            setBaseQuantity(availablePacks[0].pack_size);
+            setMultiplier(1);
+            setQuantity(availablePacks[0].pack_size);
+          } else {
+            // Fallback jika tidak ada pack
+            setBaseQuantity(1);
+            setMultiplier(1);
+            setQuantity(1);
+          }
+        } else {
+          // Produk tanpa variant: cek packs langsung dari product
+          const availablePacks = (productData.packs || []).filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+          if (availablePacks.length > 0) {
+            setBaseQuantity(availablePacks[0].pack_size);
+            setMultiplier(1);
+            setQuantity(availablePacks[0].pack_size);
+          } else {
+            // Fallback jika tidak ada pack
+            setBaseQuantity(1);
+            setMultiplier(1);
+            setQuantity(1);
+          }
+        }
         
         // Fetch related products
         try {
@@ -50,39 +86,189 @@ const ProductDetailPage = () => {
 
   const getAvailableStock = () => {
     if (!product) return 0;
-    if (typeof product.stok_available === 'number') return Math.max(0, product.stok_available);
-    return Math.max(0, (product.stok || 0) - (product.stok_reserved || 0));
+    
+    // Jika ada selected variant, gunakan stok dari variant
+    if (selectedVariant) {
+      return Math.max(0, selectedVariant.stok_available || (selectedVariant.stok || 0) - (selectedVariant.stok_reserved || 0));
+    }
+    
+    // Jika produk punya variants tapi belum dipilih, return 0
+    if (product.variants && product.variants.length > 0) {
+      return 0;
+    }
+    
+    // Produk tanpa variant: gunakan stok produk langsung
+    // Cek apakah stok_available sudah dihitung di backend
+    if (typeof product.stok_available === 'number') {
+      return Math.max(0, product.stok_available);
+    }
+    
+    // Fallback: hitung manual dari stok dan stok_reserved
+    const stok = product.stok || 0;
+    const stokReserved = product.stok_reserved || 0;
+    return Math.max(0, stok - stokReserved);
   };
 
-  const handleQuantityChange = (delta) => {
-    const newQuantity = quantity + delta;
+  // Get available packs based on selected variant or product
+  const getAvailablePacks = () => {
+    if (!product) return [];
+    
+    if (selectedVariant) {
+      // Jika ada selected variant, gunakan packs dari variant
+      return (selectedVariant.packs || []).filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+    }
+    
+    // Jika produk punya variants tapi belum dipilih, return empty
+    if (product.variants && product.variants.length > 0) {
+      return [];
+    }
+    
+    // Produk tanpa variant: gunakan packs langsung dari product
+    return (product.packs || []).filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+  };
+  
+  const getCurrentPrice = () => {
+    // Prioritas: pack harga > variant harga > product pack harga > product harga
+    if (selectedVariant) {
+      // Cari pack berdasarkan baseQuantity
+      const pack = selectedVariant.packs?.find(p => p.pack_size === baseQuantity && p.status === 'aktif');
+      
+      // Jika ada pack dengan harga_pack, gunakan harga per unit dari pack
+      if (pack && pack.harga_pack) {
+        return pack.harga_pack / pack.pack_size;
+      }
+      
+      // Jika variant punya harga_ecer, gunakan itu
+      if (selectedVariant.harga_ecer) {
+        return selectedVariant.harga_ecer;
+      }
+    }
+    
+    // Jika produk tidak punya variant tapi punya packs langsung
+    if (!selectedVariant && product?.packs && product.packs.length > 0) {
+      const pack = product.packs.find(p => p.pack_size === baseQuantity && p.status === 'aktif');
+      if (pack && pack.harga_pack) {
+        return pack.harga_pack / pack.pack_size;
+      }
+    }
+    
+    // Fallback ke harga produk
+    return product?.harga_ecer || 250000;
+  };
+
+  // Calculate total price based on quantity
+  const getTotalPrice = () => {
+    const unitPrice = getCurrentPrice();
+    return unitPrice * quantity;
+  };
+
+  const handleBaseQuantitySelect = (baseQty) => {
+    setBaseQuantity(baseQty);
     const available = getAvailableStock();
-    if (newQuantity >= 1 && newQuantity <= available) {
-      setQuantity(newQuantity);
+    const maxMultiplier = Math.floor(available / baseQty);
+    // Adjust multiplier jika melebihi stok
+    if (multiplier > maxMultiplier && maxMultiplier >= 1) {
+      setMultiplier(maxMultiplier);
+      setQuantity(baseQty * maxMultiplier);
+    } else {
+      setQuantity(baseQty * multiplier);
+    }
+  };
+  
+  const handleMultiplierChange = (delta) => {
+    const newMultiplier = multiplier + delta;
+    const available = getAvailableStock();
+    const maxMultiplier = Math.floor(available / baseQuantity);
+    if (newMultiplier >= 1 && newMultiplier <= maxMultiplier) {
+      setMultiplier(newMultiplier);
+      setQuantity(baseQuantity * newMultiplier);
+    }
+  };
+  
+  const handleMultiplierInput = (value) => {
+    const numValue = parseInt(value) || 1;
+    const available = getAvailableStock();
+    const maxMultiplier = Math.floor(available / baseQuantity);
+    const clampedValue = Math.max(1, Math.min(numValue, maxMultiplier));
+    setMultiplier(clampedValue);
+    setQuantity(baseQuantity * clampedValue);
+  };
+  
+  const handleVariantChange = (variant) => {
+    setSelectedVariant(variant);
+    // Reset quantity berdasarkan pack pertama yang tersedia dari variant
+    const availablePacks = (variant.packs || []).filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+    if (availablePacks.length > 0) {
+      setBaseQuantity(availablePacks[0].pack_size);
+      setMultiplier(1);
+      setQuantity(availablePacks[0].pack_size);
+    } else {
+      // Fallback jika tidak ada pack
+      setBaseQuantity(1);
+      setMultiplier(1);
+      setQuantity(1);
     }
   };
 
-  const handleAddToCart = () => {
-    if (product) {
-      addItem(product, quantity);
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    
+    setIsAddingToCart(true);
+    
+    try {
+      if (selectedVariant) {
+        // Produk dengan variant
+        const pack = selectedVariant.packs?.find(p => p.pack_size === baseQuantity && p.status === 'aktif');
+        await addItem(product, quantity, selectedVariant.id, pack?.id || null);
+      } else if (product.packs && product.packs.length > 0) {
+        // Produk tanpa variant tapi punya packs langsung
+        const pack = product.packs.find(p => p.pack_size === baseQuantity && p.status === 'aktif');
+        if (pack) {
+          await addItem(product, quantity, null, pack.id);
+        }
+      } else {
+        // Produk tanpa variant dan tanpa pack
+        await addItem(product, quantity, null, null);
+      }
+      
+      // Tampilkan toast notification
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+    } finally {
+      setIsAddingToCart(false);
     }
   };
 
   const handleBuyNow = async () => {
-    if (product) {
-      try {
-        // Clear cart first for "Buy Now" behavior
-        await clearCart();
-        // Add the selected product
-        await addItem(product, quantity);
-        // Navigate to checkout
-        navigate('/checkout');
-      } catch (err) {
-        console.error('Failed to process buy now:', err);
-        // Fallback: just add to cart and navigate
-        addItem(product, quantity);
-        navigate('/checkout');
+    if (!product) return;
+    
+    try {
+      // Clear cart first for "Buy Now" behavior
+      await clearCart();
+      
+      if (selectedVariant) {
+        // Produk dengan variant
+        const pack = selectedVariant.packs?.find(p => p.pack_size === baseQuantity && p.status === 'aktif');
+        await addItem(product, quantity, selectedVariant.id, pack?.id || null);
+      } else if (product.packs && product.packs.length > 0) {
+        // Produk tanpa variant tapi punya packs langsung
+        const pack = product.packs.find(p => p.pack_size === baseQuantity && p.status === 'aktif');
+        if (pack) {
+          await addItem(product, quantity, null, pack.id);
+        }
+      } else {
+        // Produk tanpa variant dan tanpa pack
+        await addItem(product, quantity, null, null);
       }
+      
+      navigate('/checkout');
+    } catch (err) {
+      console.error('Failed to process buy now:', err);
     }
   };
 
@@ -166,9 +352,14 @@ const ProductDetailPage = () => {
   if (!product) return null;
 
   const available = getAvailableStock();
-  const price = product.harga_ecer;
-  const images = Array.isArray(product.gambar) ? product.gambar : (product.gambar ? [product.gambar] : []);
+  // Gunakan gambar dari variant jika ada, atau gambar produk
+  const variantImages = selectedVariant?.gambar && Array.isArray(selectedVariant.gambar) && selectedVariant.gambar.length > 0
+    ? selectedVariant.gambar
+    : null;
+  const productImages = Array.isArray(product.gambar) ? product.gambar : (product.gambar ? [product.gambar] : []);
+  const images = variantImages || productImages;
   const currentImage = images[selectedImageIndex] || null;
+  const hasVariants = product.variants && product.variants.length > 0;
 
   return (
     <div className="relative bg-white min-h-screen overflow-x-hidden pt-[100px] pb-20">
@@ -232,7 +423,7 @@ const ProductDetailPage = () => {
                       key={idx}
                       type="button"
                       onClick={() => setSelectedImageIndex(idx)}
-                      className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
                         selectedImageIndex === idx
                           ? 'border-[#D2001A] ring-2 ring-[#D2001A] ring-opacity-30'
                           : 'border-slate-200 hover:border-slate-300'
@@ -259,48 +450,61 @@ const ProductDetailPage = () => {
               {product.nama_produk}
             </h1>
 
-            <p
-              className="font-ui font-bold text-[32px] mb-6"
-              style={{ color: '#D2001A' }}
-            >
-              Rp {Number(price || 250000).toLocaleString('id-ID')},-
-            </p>
+            <div className="mb-6">
+              <p className="text-gray-600 font-ui font-normal text-[16px] mb-1">
+                Total Harga:
+              </p>
+              <p
+                className="font-ui font-bold text-[32px]"
+                style={{ color: '#D2001A' }}
+              >
+                Rp {Number(getTotalPrice()).toLocaleString('id-ID')},-
+              </p>
+              {quantity > 1 && (
+                <p className="text-gray-500 font-ui font-normal text-[14px] mt-1">
+                  ({baseQuantity} botol × {multiplier} paket = {quantity} botol)
+                </p>
+              )}
+            </div>
 
-            {priceTiers.length > 0 && (
-              <div className="mb-6 border border-slate-200 rounded-2xl p-4 bg-slate-50">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-black font-ui font-semibold text-[18px]">Harga Tingkat</p>
-                  <span className="text-xs text-slate-500">* akan diterapkan otomatis di keranjang</span>
+            {/* Variant Selector */}
+            {hasVariants && (
+              <div className="mb-6">
+                <p className="text-black font-ui font-semibold text-[18px] mb-3">
+                  Jenis:
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {product.variants
+                    .filter((v) => v.status === 'aktif')
+                    .map((variant) => {
+                      const isSelected = selectedVariant?.id === variant.id;
+                      const variantStock = variant.stok_available || (variant.stok || 0) - (variant.stok_reserved || 0);
+                      const isOutOfStock = variantStock <= 0;
+                      
+                      return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          onClick={() => !isOutOfStock && handleVariantChange(variant)}
+                          disabled={isOutOfStock}
+                          className={`px-4 py-3 rounded-lg border-2 font-ui font-medium text-[16px] transition-all ${
+                            isSelected
+                              ? 'border-[#D2001A] bg-red-50 text-[#D2001A] ring-2 ring-[#D2001A] ring-opacity-30'
+                              : isOutOfStock
+                              ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'border-gray-300 bg-white text-black hover:border-[#D2001A] hover:bg-red-50'
+                          }`}
+                        >
+                          {variant.tipe}
+                          {isOutOfStock && <span className="block text-xs mt-1 text-gray-500">Stok habis</span>}
+                          {!isOutOfStock && variantStock < 10 && (
+                            <span className="block text-xs mt-1 text-orange-600">Tersisa {variantStock}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                 </div>
-                <div className="space-y-2">
-                  {priceTiers.map((tier) => {
-                    const label = tier.label || `≥ ${tier.min_jumlah}${tier.max_jumlah ? ` - ${tier.max_jumlah}` : ''} pcs`;
-                    // harga_total adalah total untuk min_jumlah item, jadi harga per item = harga_total / min_jumlah
-                    const perUnit = tier.harga_total && tier.min_jumlah ? tier.harga_total / tier.min_jumlah : product.harga_ecer;
-                    const sampleTotal = tier.harga_total || (perUnit * (tier.min_jumlah || 1));
-                    return (
-                      <div
-                        key={tier.id}
-                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white rounded-xl border border-slate-200 px-4 py-3"
-                      >
-                        <div>
-                          <p className="font-ui font-medium text-slate-900">{label}</p>
-                          <p className="text-xs text-slate-500">
-                            Min {tier.min_jumlah} pcs{tier.max_jumlah ? ` • Max ${tier.max_jumlah} pcs` : ''}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-ui font-semibold text-[18px]" style={{ color: '#D2001A' }}>
-                            Rp {Number(perUnit).toLocaleString('id-ID')} / pcs
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            Total untuk {tier.min_jumlah} pcs: Rp {Number(sampleTotal).toLocaleString('id-ID')}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+
               </div>
             )}
 
@@ -309,44 +513,186 @@ const ProductDetailPage = () => {
               <p className="text-black font-ui font-semibold text-[18px] mb-3">
                 Jumlah:
               </p>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => handleQuantityChange(-1)}
-                  className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center text-black font-ui font-bold text-[20px] hover:bg-gray-100 transition-colors"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  value={quantity}
-                  readOnly
-                  className="w-16 h-10 text-center border-2 border-gray-300 rounded-lg font-ui font-semibold text-[18px]"
-                />
-                <button
-                  onClick={() => handleQuantityChange(1)}
-                  className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center text-black font-ui font-bold text-[20px] hover:bg-gray-100 transition-colors"
-                >
-                  +
-                </button>
-                <span className="text-black font-ui font-normal text-[16px] ml-4">
-                  Tersedia {available}
-                </span>
-              </div>
+              
+              {/* Tampilkan pack selector hanya jika ada pack yang tersedia */}
+              {getAvailablePacks().length > 0 ? (
+                <>
+                  {/* Base Quantity Selector (dinamis berdasarkan pack yang tersedia) */}
+                  <div className="mb-3">
+                    <p className="text-gray-600 font-ui font-medium text-[14px] mb-2">
+                      Pilih jumlah per paket:
+                    </p>
+                    <div className="flex gap-3">
+                      {getAvailablePacks().map((pack) => {
+                        const baseQty = pack.pack_size;
+                        const isSelected = baseQuantity === baseQty;
+                        const maxMultiplier = Math.floor(available / baseQty);
+                        const canSelect = maxMultiplier >= 1;
+                        
+                        return (
+                          <button
+                            key={pack.id}
+                            type="button"
+                            onClick={() => canSelect && handleBaseQuantitySelect(baseQty)}
+                            disabled={!canSelect}
+                            className={`px-4 py-2 rounded-lg border-2 font-ui font-semibold text-[14px] transition-all ${
+                              isSelected
+                                ? 'border-[#D2001A] bg-[#D2001A] text-white'
+                                : canSelect
+                                ? 'border-gray-300 bg-white text-black hover:border-[#D2001A] hover:bg-red-50'
+                                : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {baseQty} Botol
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Multiplier Input (Jumlah Paket) */}
+                  <div className="mb-3">
+                    <p className="text-gray-600 font-ui font-medium text-[14px] mb-2">
+                      Jumlah paket:
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleMultiplierChange(-1)}
+                        disabled={multiplier <= 1}
+                        className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-black font-ui font-bold text-[20px] transition-colors ${
+                          multiplier <= 1
+                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        value={multiplier}
+                        onChange={(e) => handleMultiplierInput(e.target.value)}
+                        min={1}
+                        max={Math.floor(available / baseQuantity)}
+                        className="w-20 h-10 text-center border-2 border-gray-300 rounded-lg font-ui font-semibold text-[18px] focus:border-[#D2001A] focus:outline-none"
+                      />
+                      <button
+                        onClick={() => handleMultiplierChange(1)}
+                        disabled={multiplier >= Math.floor(available / baseQuantity)}
+                        className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-black font-ui font-bold text-[20px] transition-colors ${
+                          multiplier >= Math.floor(available / baseQuantity)
+                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        +
+                      </button>
+                      <span className="text-gray-600 font-ui font-normal text-[14px] ml-2">
+                        paket
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Total Quantity Display */}
+                  <div className="mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-black font-ui font-medium text-[16px]">
+                        Total: <span className="font-bold text-[18px]" style={{ color: '#D2001A' }}>{quantity} Botol</span>
+                      </span>
+                    </div>
+                    <div className="mt-2 text-gray-500 font-ui font-normal text-[12px]">
+                      Tersedia: {available} botol
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Input quantity sederhana untuk produk tanpa pack */
+                <div className="mb-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        const newQty = Math.max(1, quantity - 1);
+                        setQuantity(newQty);
+                      }}
+                      disabled={quantity <= 1}
+                      className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-black font-ui font-bold text-[20px] transition-colors ${
+                        quantity <= 1
+                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const numValue = parseInt(e.target.value) || 1;
+                        const clampedValue = Math.max(1, Math.min(numValue, available));
+                        setQuantity(clampedValue);
+                      }}
+                      min={1}
+                      max={available}
+                      className="w-20 h-10 text-center border-2 border-gray-300 rounded-lg font-ui font-semibold text-[18px] focus:border-[#D2001A] focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        const newQty = Math.min(available, quantity + 1);
+                        setQuantity(newQty);
+                      }}
+                      disabled={quantity >= available}
+                      className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-black font-ui font-bold text-[20px] transition-colors ${
+                        quantity >= available
+                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      +
+                    </button>
+                    <span className="text-gray-600 font-ui font-normal text-[14px] ml-2">
+                      botol
+                    </span>
+                  </div>
+                  <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-black font-ui font-medium text-[16px]">
+                        Total: <span className="font-bold text-[18px]" style={{ color: '#D2001A' }}>{quantity} Botol</span>
+                      </span>
+                    </div>
+                    <div className="mt-2 text-gray-500 font-ui font-normal text-[12px]">
+                      Tersedia: {available} botol
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 onClick={handleAddToCart}
-                className="flex-1 px-6 py-4 border-2 rounded-lg bg-white font-ui font-semibold text-[18px] flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
-                style={{ borderColor: '#D2001A', color: '#D2001A' }}
+                disabled={!hasVariants ? false : !selectedVariant || available === 0 || isAddingToCart}
+                className={`flex-1 px-6 py-4 border-2 rounded-lg font-ui font-semibold text-[18px] flex items-center justify-center gap-2 transition-all duration-300 ${
+                  (!hasVariants || (selectedVariant && available > 0))
+                    ? 'bg-white hover:bg-red-50 active:scale-95'
+                    : 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
+                } ${isAddingToCart ? 'animate-pulse' : ''}`}
+                style={(!hasVariants || (selectedVariant && available > 0)) ? { borderColor: '#D2001A', color: '#D2001A' } : {}}
               >
-                <img src={cartIcon} alt="" className="w-6 h-6" />
-                Masukkan Keranjang
+                <img 
+                  src={cartIcon} 
+                  alt="" 
+                  className={`w-6 h-6 transition-transform duration-300 ${isAddingToCart ? 'animate-bounce' : ''}`} 
+                />
+                {isAddingToCart ? 'Menambahkan...' : 'Masukkan Keranjang'}
               </button>
               <button
                 onClick={handleBuyNow}
-                className="flex-1 px-6 py-4 rounded-lg text-white font-ui font-semibold text-[18px] hover:opacity-90 transition-opacity"
+                disabled={!hasVariants ? false : !selectedVariant || available === 0}
+                className={`flex-1 px-6 py-4 rounded-lg text-white font-ui font-semibold text-[18px] transition-opacity ${
+                  (!hasVariants || (selectedVariant && available > 0))
+                    ? 'hover:opacity-90'
+                    : 'opacity-50 cursor-not-allowed'
+                }`}
                 style={{ backgroundColor: '#D2001A' }}
               >
                 Pesan Sekarang
@@ -440,6 +786,44 @@ const ProductDetailPage = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      <div
+        className={`fixed top-4 right-4 z-50 transition-all duration-500 ease-in-out ${
+          showToast
+            ? 'translate-x-0 opacity-100'
+            : 'translate-x-full opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="bg-white border-2 border-green-500 rounded-lg shadow-2xl p-4 flex items-center gap-3 min-w-[300px] animate-slide-in">
+          <FaCheckCircle className="text-green-500 text-2xl shrink-0" />
+          <div className="flex-1">
+            <p className="font-ui font-semibold text-gray-900 text-[16px]">
+              Produk ditambahkan ke keranjang!
+            </p>
+            <p className="font-ui font-normal text-gray-600 text-[14px] mt-1">
+              {product?.nama_produk}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Custom CSS for slide-in animation */}
+      <style>{`
+        @keyframes slide-in {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-in {
+          animation: slide-in 0.5s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

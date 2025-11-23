@@ -11,6 +11,8 @@ class StockMovement extends Model
 
     protected $fillable = [
         'product_id',
+        'product_variant_id',
+        'product_variant_pack_id',
         'order_id',
         'user_id',
         'change_qty',
@@ -37,5 +39,15 @@ class StockMovement extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function productVariant()
+    {
+        return $this->belongsTo(ProductVariant::class);
+    }
+
+    public function productVariantPack()
+    {
+        return $this->belongsTo(ProductVariantPack::class);
     }
 }

@@ -607,42 +607,94 @@ const OrderSuccessPage = () => {
               Produk yang dibeli
             </h2>
             <div className="space-y-4">
-              {(order.items ?? []).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-4 pb-4 border-b last:border-0 last:pb-0"
-                >
-                  <div className="w-16 h-16 bg-[#f1f1f1] rounded flex items-center justify-center shrink-0 overflow-hidden relative">
-                    {item.product?.gambar ? (
-                      <>
-                        <img
-                          src={getProductImageUrl(item.product.gambar)}
-                          alt={item.product?.nama_produk || 'produk'}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-                        <span className="text-xs text-slate-400 hidden">Gambar</span>
-                      </>
-                    ) : (
-                      <span className="text-xs text-slate-400">Gambar</span>
-                    )}
+              {(order.items ?? []).map((item) => {
+                // Calculate pack info if exists
+                let packQuantity = item.jumlah;
+                let packPrice = item.harga_satuan || 0;
+                let totalPrice = packPrice * packQuantity;
+                
+                if (item.product_variant_pack?.pack_size) {
+                  const packSize = item.product_variant_pack.pack_size;
+                  packQuantity = Math.floor(item.jumlah / packSize);
+                  // If pack has harga_pack, use it; otherwise calculate from harga_satuan
+                  if (item.product_variant_pack.harga_pack) {
+                    packPrice = item.product_variant_pack.harga_pack;
+                    totalPrice = packPrice * packQuantity;
+                  } else {
+                    // Fallback: harga_satuan is already per unit, multiply by pack_size
+                    packPrice = (item.harga_satuan || 0) * packSize;
+                    totalPrice = packPrice * packQuantity;
+                  }
+                }
+                
+                const variantLabel = item.product_variant?.tipe || '';
+                const packLabel = item.product_variant_pack?.label || '';
+                
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-4 pb-4 border-b last:border-0 last:pb-0"
+                  >
+                    <div className="w-16 h-16 bg-[#f1f1f1] rounded flex items-center justify-center shrink-0 overflow-hidden relative">
+                      {item.product?.gambar ? (
+                        <>
+                          <img
+                            src={getProductImageUrl(item.product.gambar)}
+                            alt={item.product?.nama_produk || 'produk'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                          <span className="text-xs text-slate-400 hidden">Gambar</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-400">Gambar</span>
+                      )}
+                    </div>
+                    <div className="grow">
+                      <p className="font-ui font-medium text-gray-900 mb-1">
+                        {item.product?.nama_produk ?? item.product_id}
+                      </p>
+                      {(variantLabel || packLabel) && (
+                        <div className="mb-1 text-xs text-slate-600 space-y-0.5">
+                          {variantLabel && (
+                            <p>
+                              <span className="font-semibold">Varian:</span> {variantLabel}
+                            </p>
+                          )}
+                          {packLabel && (
+                            <p>
+                              <span className="font-semibold">Paket:</span> {packLabel}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <p className="font-ui text-sm text-gray-500">
+                        {item.product_variant_pack?.pack_size ? (
+                          <>
+                            {packQuantity} paket × {item.product_variant_pack.pack_size} botol = {item.jumlah} botol
+                          </>
+                        ) : (
+                          <>x {item.jumlah}</>
+                        )}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-ui font-semibold text-gray-900">
+                        {formatPrice(packPrice)}
+                      </p>
+                      {item.product_variant_pack?.pack_size && (
+                        <p className="font-ui text-xs text-gray-500">per paket</p>
+                      )}
+                      <p className="font-ui font-medium text-gray-700 mt-1">
+                        Total: {formatPrice(totalPrice)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="grow">
-                    <p className="font-ui font-medium text-gray-900 mb-1">
-                      {item.product?.nama_produk ?? item.product_id}
-                    </p>
-                    <p className="font-ui text-sm text-gray-500">x {item.jumlah}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-ui font-semibold text-gray-900">
-                      {formatPrice(item.harga_satuan || 0)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

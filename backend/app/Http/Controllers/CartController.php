@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\ProductVariantPack;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use OpenApi\Annotations as OA;
@@ -21,7 +23,7 @@ class CartController extends Controller
      */
     public function index()
     {
-        $cartItems = CartItem::with(['product', 'priceTier'])
+        $cartItems = CartItem::with(['product', 'productVariant', 'productVariantPack'])
             ->where('user_id', Auth::id())
             ->get();
 
@@ -48,18 +50,48 @@ class CartController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'product_id' => 'required|exists:products,id',
+            'product_variant_id' => ['nullable', 'exists:product_variants,id'],
+            'product_variant_pack_id' => ['nullable', 'exists:product_variant_packs,id'],
             'qty' => 'required|integer|min:1',
         ]);
 
         $userId = Auth::id();
-        $productId = $request->product_id;
-        $qty = $request->qty;
+        $productId = (int) $data['product_id'];
+        $variantId = $data['product_variant_id'] ?? null;
+        $packId = $data['product_variant_pack_id'] ?? null;
+        $qty = (int) $data['qty'];
 
-        // Check if item already exists in cart
+        $product = Product::findOrFail($productId);
+        $variant = null;
+        $pack = null;
+
+        if ($variantId) {
+            $variant = ProductVariant::where('product_id', $product->id)->findOrFail($variantId);
+        }
+
+        if ($packId) {
+            $pack = ProductVariantPack::findOrFail($packId);
+            if ($variant && $pack->product_variant_id !== $variant->id) {
+                return $this->fail('Paket tidak sesuai dengan varian yang dipilih', 422);
+            }
+            if (! $variant) {
+                // ensure pack belongs to product
+                $packVariant = $pack->variant()->first();
+                if (! $packVariant || $packVariant->product_id !== $product->id) {
+                    return $this->fail('Paket tidak sesuai dengan produk yang dipilih', 422);
+                }
+                $variant = $packVariant;
+                $variantId = $variant->id;
+            }
+        }
+
+        // Check if item already exists in cart with same variant/pack
         $cartItem = CartItem::where('user_id', $userId)
             ->where('product_id', $productId)
+            ->when($variantId, fn($q) => $q->where('product_variant_id', $variantId), fn($q) => $q->whereNull('product_variant_id'))
+            ->when($packId, fn($q) => $q->where('product_variant_pack_id', $packId), fn($q) => $q->whereNull('product_variant_pack_id'))
             ->first();
 
         if ($cartItem) {
@@ -69,11 +101,13 @@ class CartController extends Controller
             $cartItem = CartItem::create([
                 'user_id' => $userId,
                 'product_id' => $productId,
+                'product_variant_id' => $variantId,
+                'product_variant_pack_id' => $packId,
                 'jumlah' => $qty,
             ]);
         }
 
-        return response()->json($cartItem->load(['product', 'priceTier']));
+        return response()->json($cartItem->load(['product', 'productVariant', 'productVariantPack']));
     }
 
     /**
@@ -108,7 +142,7 @@ class CartController extends Controller
         $cartItem->jumlah = $request->qty;
         $cartItem->save();
 
-        return response()->json($cartItem->load(['product', 'priceTier']));
+        return response()->json($cartItem->load(['product', 'productVariant', 'productVariantPack']));
     }
 
     /**

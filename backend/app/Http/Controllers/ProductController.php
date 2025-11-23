@@ -50,6 +50,10 @@ class ProductController extends Controller
         $products = Product::query()
             ->with(['category']);
 
+        if ($request->boolean('include_variants', false)) {
+            $products->with(['variants.packs', 'packs']);
+        }
+
         if ($request->filled('status')) {
             $products->where('status', $request->string('status'));
         }
@@ -86,9 +90,26 @@ class ProductController extends Controller
         return $this->success($categories);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/products/{id}",
+     *     tags={"Products"},
+     *     summary="Detail produk",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Detail produk beserta harga tingkat",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean"),
+     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="message", type="string", nullable=true)
+     *         )
+     *     )
+     * )
+     */
     public function show(int $id)
     {
-        $product = Product::with(['category'])->findOrFail($id);
+        $product = Product::with(['category', 'variants.packs', 'packs'])->findOrFail($id);
 
         return $this->success($product);
     }
@@ -106,6 +127,7 @@ class ProductController extends Controller
      *             @OA\Property(property="kategori_id", type="integer"),
      *             @OA\Property(property="sku", type="string"),
      *             @OA\Property(property="nama_produk", type="string"),
+     *             @OA\Property(property="tipe", type="string", nullable=true, description="Tipe/varian produk (contoh: BP REGULER, BP KIDS, BP BLUE)"),
      *             @OA\Property(property="deskripsi", type="string", nullable=true),
      *             @OA\Property(property="harga_ecer", type="number", format="float"),
      *             @OA\Property(property="stok", type="integer", nullable=true),
@@ -123,8 +145,9 @@ class ProductController extends Controller
 
         $data = $request->validate([
             'kategori_id' => ['required', 'exists:kategori,id'],
-            'sku' => ['required', 'string', 'max:50', 'unique:products,sku'],
+            'sku' => ['nullable', 'string', 'max:50', 'unique:products,sku'],
             'nama_produk' => ['required', 'string', 'max:255'],
+            'tipe' => ['nullable', 'string', 'max:100'],
             'deskripsi' => ['nullable', 'string'],
             'harga_ecer' => ['required', 'numeric', 'min:0'],
             'stok' => ['nullable', 'integer', 'min:0'],
@@ -164,6 +187,11 @@ class ProductController extends Controller
             $data['berat'] = 500;
         }
 
+        // Convert empty SKU string to null
+        if (isset($data['sku']) && $data['sku'] === '') {
+            $data['sku'] = null;
+        }
+
         $product = Product::create($data);
 
         if (($product->stok ?? 0) > 0) {
@@ -191,6 +219,7 @@ class ProductController extends Controller
      *             @OA\Property(property="kategori_id", type="integer"),
      *             @OA\Property(property="sku", type="string"),
      *             @OA\Property(property="nama_produk", type="string"),
+     *             @OA\Property(property="tipe", type="string", nullable=true, description="Tipe/varian produk (contoh: BP REGULER, BP KIDS, BP BLUE)"),
      *             @OA\Property(property="deskripsi", type="string"),
      *             @OA\Property(property="harga_ecer", type="number", format="float"),
      *             @OA\Property(property="stok", type="integer"),
@@ -210,8 +239,9 @@ class ProductController extends Controller
 
         $data = $request->validate([
             'kategori_id' => ['sometimes', 'exists:kategori,id'],
-            'sku' => ['sometimes', 'string', 'max:50', 'unique:products,sku,' . $product->id],
+            'sku' => ['nullable', 'string', 'max:50', 'unique:products,sku,' . $product->id],
             'nama_produk' => ['sometimes', 'string', 'max:255'],
+            'tipe' => ['nullable', 'string', 'max:100'],
             'deskripsi' => ['nullable', 'string'],
             'harga_ecer' => ['sometimes', 'numeric', 'min:0'],
             'stok' => ['nullable', 'integer', 'min:0'],
@@ -259,6 +289,11 @@ class ProductController extends Controller
             $data['gambar'] = !empty($currentImages) ? $currentImages : null;
         }
 
+        // Convert empty SKU string to null
+        if (isset($data['sku']) && $data['sku'] === '') {
+            $data['sku'] = null;
+        }
+
         $originalStock = (int) $product->stok;
 
         $product->fill($data);
@@ -300,7 +335,12 @@ class ProductController extends Controller
     {
         $this->authorize('admin');
 
-        $product = Product::findOrFail($id);
+        $product = Product::with('variants')->findOrFail($id);
+
+        // Jika produk sudah punya variant, stok harus dikelola di level variant/pack
+        if ($product->variants->isNotEmpty()) {
+            return $this->fail('Produk ini sudah memiliki varian. Silakan kelola stok melalui varian atau paket varian.', 422);
+        }
 
         $data = $request->validate([
             'qty' => ['required', 'integer'],
@@ -393,6 +433,7 @@ class ProductController extends Controller
 
         $products = Product::query()
             ->select(['id', 'nama_produk', 'sku', 'stok', 'stok_reserved'])
+            ->doesntHave('variants')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = trim((string) $request->input('search'));
                 $query->where(function ($q) use ($search) {

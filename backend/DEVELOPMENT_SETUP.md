@@ -41,6 +41,22 @@ php artisan orders:release-expired-reservations
 php artisan tracking:sync
 ```
 
+**Atau via API Endpoint (Lebih Mudah):**
+
+```bash
+# Via curl atau Postman
+curl -X POST http://localhost:8000/api/admin/run-tracking-sync \
+  -H "Authorization: Bearer {ADMIN_TOKEN}"
+
+# Sync order tertentu saja
+curl -X POST "http://localhost:8000/api/admin/run-tracking-sync?order_id=123" \
+  -H "Authorization: Bearer {ADMIN_TOKEN}"
+
+# Sync dengan limit custom
+curl -X POST "http://localhost:8000/api/admin/run-tracking-sync?limit=100" \
+  -H "Authorization: Bearer {ADMIN_TOKEN}"
+```
+
 #### Opsi B: Scheduler Otomatis (Lebih Praktis)
 
 Setup scheduler agar berjalan otomatis:

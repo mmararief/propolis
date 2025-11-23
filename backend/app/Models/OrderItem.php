@@ -13,12 +13,13 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'product_id',
+        'product_variant_id',
+        'product_variant_pack_id',
         'harga_satuan',
         'jumlah',
         'total_harga',
         'catatan',
         'allocated',
-        'harga_tingkat_id',
     ];
 
     protected $casts = [
@@ -41,9 +42,14 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function priceTier()
+    public function productVariant()
     {
-        return $this->belongsTo(PriceTier::class, 'harga_tingkat_id');
+        return $this->belongsTo(ProductVariant::class);
+    }
+
+    public function productVariantPack()
+    {
+        return $this->belongsTo(ProductVariantPack::class);
     }
 
     public function productCodes(): HasMany

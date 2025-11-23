@@ -39,6 +39,8 @@ const generateId = () => {
 const createEmptyItem = () => ({
   id: generateId(),
   product_id: '',
+  product_variant_id: '',
+  product_variant_pack_id: '',
   qty: 1,
   price: '',
 });
@@ -72,7 +74,6 @@ const AdminOrderManualPage = () => {
   });
   const [items, setItems] = useState([createEmptyItem()]);
   const [products, setProducts] = useState([]);
-  const [priceTiers, setPriceTiers] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [cities, setCities] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -85,17 +86,7 @@ const AdminOrderManualPage = () => {
   useEffect(() => {
     fetchProducts();
     fetchProvinces();
-    fetchPriceTiers();
   }, []);
-
-  const fetchPriceTiers = async () => {
-    try {
-      const { data } = await api.get('/admin/price-tiers');
-      setPriceTiers(data.data ?? data ?? []);
-    } catch (err) {
-      console.error('Error loading price tiers:', err);
-    }
-  };
 
   useEffect(() => {
     if (form.customer.province_id) {
@@ -127,7 +118,7 @@ const AdminOrderManualPage = () => {
   const fetchProducts = async () => {
     setLoadingProducts(true);
     try {
-      const { data } = await api.get('/products', { params: { per_page: 100 } });
+      const { data } = await api.get('/products', { params: { per_page: 100, include_variants: true } });
       setProducts(data.data?.data ?? data.data ?? []);
     } catch (err) {
       setError(err.message);
@@ -237,53 +228,101 @@ const AdminOrderManualPage = () => {
     });
   };
 
-  const getPriceTierForQty = (qty) => {
-    if (!qty || qty <= 0) return null;
-    const qtyNum = Number(qty);
+  // Get available packs for a product or variant
+  const getAvailablePacks = (product, variantId = null) => {
+    if (!product) return [];
     
-    // Cari tier yang sesuai dengan qty
-    const matchingTier = priceTiers
-      .filter(tier => tier.min_jumlah <= qtyNum && (!tier.max_jumlah || tier.max_jumlah >= qtyNum))
-      .sort((a, b) => b.min_jumlah - a.min_jumlah)[0]; // Ambil tier dengan min_jumlah terbesar
+    if (variantId) {
+      const variant = product.variants?.find(v => v.id === variantId);
+      if (variant?.packs) {
+        return variant.packs.filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+      }
+    }
     
-    return matchingTier;
+    // Direct product packs (no variant)
+    if (product.packs && product.packs.length > 0) {
+      return product.packs.filter(p => p.status === 'aktif').sort((a, b) => a.pack_size - b.pack_size);
+    }
+    
+    return [];
   };
 
-  const calculatePriceFromTier = (tier, qty) => {
-    if (!tier || !qty) return null;
-    // harga_total adalah total untuk min_jumlah, jadi hitung harga per item
-    const pricePerItem = tier.harga_total / tier.min_jumlah;
-    return pricePerItem * Number(qty);
+  // Get price per unit based on variant/pack selection
+  const getPricePerUnit = (product, variantId, packId) => {
+    if (!product) return 0;
+    
+    if (variantId && packId) {
+      const variant = product.variants?.find(v => v.id === variantId);
+      const pack = variant?.packs?.find(p => p.id === packId);
+      if (pack && pack.harga_pack) {
+        // Harga per botol dari pack
+        return pack.harga_pack / pack.pack_size;
+      }
+      if (variant?.harga_ecer) {
+        return variant.harga_ecer;
+      }
+    }
+    
+    if (packId && !variantId) {
+      const pack = product.packs?.find(p => p.id === packId);
+      if (pack && pack.harga_pack) {
+        // Harga per botol dari pack
+        return pack.harga_pack / pack.pack_size;
+      }
+    }
+    
+    return product.harga_ecer || 0;
   };
 
   const updateItem = (itemId, field, value) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
+        
+        const updatedItem = { ...item, [field]: value };
+        const product = products.find((p) => p.id === Number(item.product_id || value));
+        
         if (field === 'product_id') {
-          const product = products.find((p) => p.id === Number(value));
-          return {
-            ...item,
-            product_id: value,
-            price: product ? product.harga_ecer ?? 0 : item.price,
-          };
-        }
-        if (field === 'qty') {
-          // Saat qty berubah, cek apakah ada tier yang sesuai dan update harga jika perlu
-          const updatedItem = { ...item, qty: value };
-          const tier = getPriceTierForQty(value);
-          if (tier) {
-            const suggestedPrice = tier.harga_total / tier.min_jumlah;
-            // Hanya update harga jika user belum mengubahnya secara manual
-            // Atau jika harga saat ini sama dengan harga dari tier sebelumnya
-            const currentTier = getPriceTierForQty(item.qty);
-            if (!currentTier || item.price === (currentTier.harga_total / currentTier.min_jumlah)) {
-              updatedItem.price = suggestedPrice;
-            }
+          // Reset variant dan pack saat ganti produk
+          updatedItem.product_variant_id = '';
+          updatedItem.product_variant_pack_id = '';
+          if (product) {
+            const qty = Number(item.qty) || 1;
+            const pricePerUnit = getPricePerUnit(product, null, null);
+            updatedItem.price = pricePerUnit * qty;
+          } else {
+            updatedItem.price = 0;
           }
-          return updatedItem;
+        } else if (field === 'product_variant_id') {
+          // Reset pack saat ganti variant
+          updatedItem.product_variant_pack_id = '';
+          if (product) {
+            const variantId = value ? Number(value) : null;
+            const qty = Number(item.qty) || 1;
+            const pricePerUnit = getPricePerUnit(product, variantId, null);
+            updatedItem.price = pricePerUnit * qty;
+          }
+        } else if (field === 'product_variant_pack_id') {
+          // Update harga berdasarkan pack
+          if (product && value) {
+            const variantId = item.product_variant_id ? Number(item.product_variant_id) : null;
+            const packId = Number(value);
+            const qty = Number(item.qty) || 1;
+            const pricePerUnit = getPricePerUnit(product, variantId, packId);
+            updatedItem.price = pricePerUnit * qty;
+          }
+        } else if (field === 'qty') {
+          // Update harga saat qty berubah jika ada pack/variant
+          if (product) {
+            const variantId = item.product_variant_id ? Number(item.product_variant_id) : null;
+            const packId = item.product_variant_pack_id ? Number(item.product_variant_pack_id) : null;
+            const qty = Number(value) || 1;
+            const pricePerUnit = getPricePerUnit(product, variantId, packId);
+            updatedItem.price = pricePerUnit * qty;
+          }
         }
-        return { ...item, [field]: value };
+        
+        return updatedItem;
       }),
     );
   };
@@ -317,6 +356,8 @@ const AdminOrderManualPage = () => {
       .filter((item) => item.product_id)
       .map((item) => ({
         product_id: Number(item.product_id),
+        product_variant_id: item.product_variant_id ? Number(item.product_variant_id) : null,
+        product_variant_pack_id: item.product_variant_pack_id ? Number(item.product_variant_pack_id) : null,
         qty: Number(item.qty) || 0,
         price: Number(item.price) || 0,
       }));
@@ -603,19 +644,30 @@ const AdminOrderManualPage = () => {
               <thead>
                 <tr className="text-left text-slate-500 border-b">
                   <th className="py-2">Produk</th>
-                  <th className="py-2 w-24">Qty</th>
-                  <th className="py-2 w-32">Harga Satuan</th>
-                  <th className="py-2 w-32">Subtotal</th>
+                  <th className="py-2 w-32">Varian</th>
+                  <th className="py-2 w-32">Paket</th>
+                  <th className="py-2 w-24">Qty (Botol)</th>
+                  <th className="py-2 w-32">Harga Total</th>
                   <th className="py-2 w-16 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => {
                   const selectedProduct = products.find((p) => p.id === Number(item.product_id));
-                  const readyStock =
-                    selectedProduct?.stok_available ??
-                    Math.max(0, (selectedProduct?.stok ?? 0) - (selectedProduct?.stok_reserved ?? 0));
-                  const reservedStock = selectedProduct?.stok_reserved ?? 0;
+                  const hasVariants = selectedProduct?.variants && selectedProduct.variants.length > 0;
+                  const selectedVariant = selectedProduct?.variants?.find(v => v.id === Number(item.product_variant_id));
+                  const availablePacks = getAvailablePacks(selectedProduct, item.product_variant_id ? Number(item.product_variant_id) : null);
+                  const selectedPack = availablePacks.find(p => p.id === Number(item.product_variant_pack_id));
+                  
+                  // Calculate available stock
+                  let readyStock = 0;
+                  if (selectedVariant) {
+                    readyStock = selectedVariant.stok_available ?? Math.max(0, (selectedVariant.stok || 0) - (selectedVariant.stok_reserved || 0));
+                  } else if (selectedProduct) {
+                    readyStock = selectedProduct.stok_available ?? Math.max(0, (selectedProduct.stok || 0) - (selectedProduct.stok_reserved || 0));
+                  }
+                  
+                  const reservedStock = selectedVariant?.stok_reserved ?? selectedProduct?.stok_reserved ?? 0;
 
                   return (
                     <tr key={item.id} className="border-b">
@@ -630,20 +682,55 @@ const AdminOrderManualPage = () => {
                             <option value="">Pilih Produk</option>
                             {products.map((product) => (
                               <option key={product.id} value={product.id}>
-                                {product.nama_produk} ({product.sku})
+                                {product.nama_produk} {product.sku ? `(${product.sku})` : ''}
                               </option>
                             ))}
                           </select>
                           {selectedProduct && (
                             <p className="text-xs text-slate-500">
-                              Ready:{' '}
-                              <span className="font-semibold text-slate-900">
-                                {readyStock}
-                              </span>{' '}
-                              pcs · Reserved: {reservedStock} pcs
+                              Stok: <span className="font-semibold text-slate-900">{readyStock}</span> botol
                             </p>
                           )}
                         </div>
+                      </td>
+                      <td className="py-2 pr-3 align-top">
+                        {selectedProduct && hasVariants ? (
+                          <select
+                            className="input-field w-full"
+                            value={item.product_variant_id || ''}
+                            onChange={(e) => updateItem(item.id, 'product_variant_id', e.target.value)}
+                          >
+                            <option value="">Pilih Varian</option>
+                            {selectedProduct.variants
+                              .filter(v => v.status === 'aktif')
+                              .map((variant) => (
+                                <option key={variant.id} value={variant.id}>
+                                  {variant.tipe}
+                                </option>
+                              ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">-</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 align-top">
+                        {selectedProduct && availablePacks.length > 0 ? (
+                          <select
+                            className="input-field w-full"
+                            value={item.product_variant_pack_id || ''}
+                            onChange={(e) => updateItem(item.id, 'product_variant_pack_id', e.target.value)}
+                            disabled={hasVariants && !item.product_variant_id}
+                          >
+                            <option value="">Pilih Paket</option>
+                            {availablePacks.map((pack) => (
+                              <option key={pack.id} value={pack.id}>
+                                {pack.label || `${pack.pack_size} Botol`} - Rp {pack.harga_pack?.toLocaleString('id-ID')}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">-</span>
+                        )}
                       </td>
                       <td className="py-2 pr-3">
                         <input
@@ -655,46 +742,24 @@ const AdminOrderManualPage = () => {
                         />
                         {selectedProduct && readyStock < Number(item.qty || 0) && (
                           <p className="text-[11px] text-red-600 mt-1">
-                            Jumlah melebihi stok ready ({readyStock} pcs)
+                            Melebihi stok ({readyStock} botol)
                           </p>
                         )}
                       </td>
                       <td className="py-2 pr-3">
-                        <div className="space-y-1">
-                          <input
-                            type="number"
-                            min="0"
-                            className="input-field w-full"
-                            value={item.price}
-                            onChange={(e) => updateItem(item.id, 'price', e.target.value)}
-                          />
-                          {(() => {
-                            const tier = getPriceTierForQty(item.qty);
-                            if (tier) {
-                              const suggestedPrice = tier.harga_total / tier.min_jumlah;
-                              const isUsingTierPrice = Math.abs(Number(item.price) - suggestedPrice) < 0.01;
-                              return (
-                                <p className="text-[11px] text-slate-500">
-                                  {isUsingTierPrice ? (
-                                    <span className="text-green-600 font-semibold">
-                                      ✓ {tier.label || 'Tier'} ({tier.min_jumlah}
-                                      {tier.max_jumlah ? `-${tier.max_jumlah}` : '+'} item)
-                                    </span>
-                                  ) : (
-                                    <span>
-                                      Saran: {tier.label || 'Tier'} - Rp{' '}
-                                      {suggestedPrice.toLocaleString('id-ID')}/item
-                                    </span>
-                                  )}
-                                </p>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-3 font-semibold text-slate-900">
-                        Rp {((Number(item.qty) || 0) * (Number(item.price) || 0)).toLocaleString('id-ID')}
+                        <input
+                          type="number"
+                          min="0"
+                          className="input-field w-full"
+                          value={item.price}
+                          onChange={(e) => updateItem(item.id, 'price', e.target.value)}
+                          placeholder="Harga total"
+                        />
+                        {selectedPack && (
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            {selectedPack.pack_size} botol/paket × Rp {(selectedPack.harga_pack / selectedPack.pack_size).toLocaleString('id-ID')}/botol
+                          </p>
+                        )}
                       </td>
                       <td className="py-2 text-right">
                         <button

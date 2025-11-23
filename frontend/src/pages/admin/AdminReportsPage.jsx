@@ -68,6 +68,49 @@ const AdminReportsPage = () => {
     return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  // Helper function untuk mendapatkan grouped dan sorted items (digunakan di header dan body)
+  const getGroupedAndSortedItems = () => {
+    const validItems = (historyData.products || []).filter(
+      item => item && (item.type === 'product' || item.type === 'variant') && item.product_id
+    );
+
+    const grouped = validItems.reduce((acc, item) => {
+      const key = String(item.product_id);
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(item);
+      return acc;
+    }, {});
+
+    // Sort items dalam setiap group: variant dulu
+    Object.keys(grouped).forEach(key => {
+      grouped[key].sort((a, b) => {
+        if (a.type === 'variant' && b.type === 'product') return -1;
+        if (a.type === 'product' && b.type === 'variant') return 1;
+        if (a.type === 'variant' && b.type === 'variant') {
+          return (a.variant_id || 0) - (b.variant_id || 0);
+        }
+        return 0;
+      });
+    });
+
+    // Sort: produk dengan variant dulu, lalu produk tanpa variant
+    const sortedGroups = Object.entries(grouped).sort(([aId, aItems], [bId, bItems]) => {
+      const aHasVariants = aItems.some(item => item.type === 'variant');
+      const bHasVariants = bItems.some(item => item.type === 'variant');
+
+      // Produk dengan variant dulu
+      if (aHasVariants && !bHasVariants) return -1;
+      if (!aHasVariants && bHasVariants) return 1;
+
+      // Jika sama, sort by product_id
+      return Number(aId) - Number(bId);
+    });
+
+    return sortedGroups;
+  };
+
   const fetchSales = async (page = 1) => {
     setError(null);
     setLoading((prev) => ({ ...prev, sales: true }));
@@ -136,7 +179,8 @@ const AdminReportsPage = () => {
           interval: historyFilters.interval || undefined,
         },
       });
-      setHistoryData(data.data ?? data ?? { products: [], segments: [] });
+      const historyData = data.data ?? data ?? { products: [], segments: [] };
+      setHistoryData(historyData);
     } catch (err) {
       setError(err.message || 'Gagal memuat riwayat stok');
     } finally {
@@ -525,54 +569,144 @@ const AdminReportsPage = () => {
         </header>
 
         <div className="overflow-x-auto rounded-lg border border-slate-100">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm border-collapse">
             <thead className="bg-slate-50">
+              {/* Header row pertama: Nama produk dengan merged cells (hanya untuk produk dengan variant) */}
               <tr>
-                <th className="px-3 py-2 text-left">Tanggal</th>
-                {historyData.products.map((product) => (
-                  <th key={product.id} className="px-3 py-2 text-left whitespace-nowrap">
-                    {product.nama_produk}
-                    {product.sku && <span className="text-xs text-slate-500"> ({product.sku})</span>}
-                  </th>
-                ))}
-                <th className="px-3 py-2 text-left">Terjual</th>
-                <th className="px-3 py-2 text-left">Beli Stock</th>
-                <th className="px-3 py-2 text-left">Total Stock</th>
+                <th rowSpan={2} className="px-3 py-2 text-left border border-slate-200">Tanggal</th>
+                {(() => {
+                  const sortedGroups = getGroupedAndSortedItems();
+
+                  return sortedGroups
+                    .map(([productId, items]) => {
+                      // Ambil item variant pertama untuk mendapatkan nama_produk
+                      const firstVariant = items.find(item => item.type === 'variant');
+                      const firstItem = firstVariant || items.find(item => item.type === 'product');
+
+                      // Hitung colSpan: hanya variant yang akan ditampilkan di row 2
+                      const variants = items.filter(item => item.type === 'variant');
+                      const colSpan = variants.length;
+                      const hasVariants = variants.length > 0;
+
+                      // Jika produk tidak punya variant, render th dengan rowSpan=2
+                      if (!hasVariants) {
+                        return (
+                          <th
+                            key={`product-${productId}`}
+                            rowSpan={2}
+                            className="px-3 py-2 text-center border border-slate-200 bg-orange-50 font-semibold align-middle"
+                          >
+                            {firstItem.nama_produk}
+                          </th>
+                        );
+                      }
+
+                      return (
+                        <th
+                          key={`product-${productId}`}
+                          colSpan={colSpan}
+                          className="px-3 py-2 text-center border border-slate-200 bg-orange-50 font-semibold"
+                        >
+                          {firstItem.nama_produk}
+                        </th>
+                      );
+                    })
+                    .filter(Boolean);
+                })()}
+                <th colSpan={2} className="px-3 py-2 text-center border border-slate-200 bg-orange-50 font-semibold">
+                  CATATAN
+                </th>
+                <th rowSpan={2} className="px-3 py-2 text-center border border-slate-200 bg-orange-50 font-semibold">
+                  TOTAL STOCK
+                </th>
+              </tr>
+              {/* Header row kedua: Variant names (untuk produk dengan variant) atau nama produk (untuk produk tanpa variant) */}
+              <tr>
+                {(() => {
+                  const sortedGroups = getGroupedAndSortedItems();
+
+                  return sortedGroups.flatMap(([, items]) => {
+                    const hasVariants = items.some(item => item.type === 'variant');
+
+                    // Jika punya variant, hanya tampilkan variant (jangan tampilkan product)
+                    // Jika tidak punya variant, skip (karena sudah di-handle di row 1 dengan rowSpan=2)
+                    if (!hasVariants) {
+                      return [];
+                    }
+
+                    const itemsToShow = items.filter(item => item.type === 'variant').sort((a, b) => (a.variant_id || 0) - (b.variant_id || 0));
+
+                    return itemsToShow.map((item) => (
+                      <th
+                        key={item.id}
+                        className={`px-3 py-2 text-center border border-slate-200 ${hasVariants ? 'bg-slate-100' : 'bg-orange-50 font-semibold'
+                          }`}
+                      >
+                        {item.type === 'variant' ? (
+                          <>
+                            {item.variant_tipe}
+                            {item.sku && <span className="text-xs text-slate-500"> ({item.sku})</span>}
+                          </>
+                        ) : (
+                          <>
+                            {item.nama_produk}
+                            {item.sku && <span className="text-xs text-slate-500"> ({item.sku})</span>}
+                          </>
+                        )}
+                      </th>
+                    ));
+                  });
+                })()}
+                <th className="px-3 py-2 text-center border border-slate-200 bg-slate-100">Terjual</th>
+                <th className="px-3 py-2 text-center border border-slate-200 bg-slate-100">Beli Stock</th>
               </tr>
             </thead>
             <tbody>
               {loading.history ? (
                 <tr>
-                  <td colSpan={historyData.products.length + 4} className="px-3 py-4 text-center text-slate-500">
+                  <td colSpan={historyData.products.length + 5} className="px-3 py-4 text-center text-slate-500 border border-slate-200">
                     Memuat riwayat stok...
                   </td>
                 </tr>
               ) : historyData.segments.length === 0 ? (
                 <tr>
-                  <td colSpan={historyData.products.length + 4} className="px-3 py-4 text-center text-slate-500">
+                  <td colSpan={historyData.products.length + 5} className="px-3 py-4 text-center text-slate-500 border border-slate-200">
                     Tidak ada data riwayat stok untuk periode ini.
                   </td>
                 </tr>
               ) : (
-                historyData.segments.map((segment) => (
-                  <tr key={segment.date} className="border-t border-slate-50">
-                    <td className="px-3 py-2 text-slate-600">{formatDate(segment.date)}</td>
-                    {historyData.products.map((product) => (
-                      <td key={`${segment.date}-${product.id}`} className="px-3 py-2">
-                        {formatNumber(segment.products?.[product.id] ?? 0)}
+                historyData.segments.map((segment) => {
+                  // Gunakan helper function yang sama seperti header
+                  const sortedGroups = getGroupedAndSortedItems();
+
+                  // Flatten items dengan urutan yang sama seperti header
+                  const itemsToShow = sortedGroups.flatMap(([, items]) => {
+                    const hasVariants = items.some(item => item.type === 'variant');
+                    return hasVariants
+                      ? items.filter(item => item.type === 'variant').sort((a, b) => (a.variant_id || 0) - (b.variant_id || 0))
+                      : items.filter(item => item.type === 'product');
+                  });
+
+                  return (
+                    <tr key={segment.date} className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-600 border border-slate-200">{formatDate(segment.date)}</td>
+                      {itemsToShow.map((item) => (
+                        <td key={`${segment.date}-${item.id}`} className="px-3 py-2 text-center border border-slate-200">
+                          {formatNumber(segment.products?.[item.id] ?? 0)}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-slate-900 font-semibold text-center border border-slate-200">
+                        {formatNumber(segment.notes?.sold ?? 0)}
                       </td>
-                    ))}
-                    <td className="px-3 py-2 text-slate-900 font-semibold">
-                      {formatNumber(segment.notes?.sold ?? 0)}
-                    </td>
-                    <td className="px-3 py-2 text-slate-900 font-semibold">
-                      {formatNumber(segment.notes?.restock ?? 0)}
-                    </td>
-                    <td className="px-3 py-2 text-slate-900 font-semibold">
-                      {formatNumber(segment.notes?.total_stock ?? 0)}
-                    </td>
-                  </tr>
-                ))
+                      <td className="px-3 py-2 text-slate-900 font-semibold text-center border border-slate-200">
+                        {formatNumber(segment.notes?.restock ?? 0)}
+                      </td>
+                      <td className="px-3 py-2 text-slate-900 font-semibold text-center border border-slate-200">
+                        {formatNumber(segment.notes?.total_stock ?? 0)}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

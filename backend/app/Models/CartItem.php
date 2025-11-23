@@ -14,7 +14,8 @@ class CartItem extends Model
     protected $fillable = [
         'user_id',
         'product_id',
-        'harga_tingkat_id',
+        'product_variant_id',
+        'product_variant_pack_id',
         'jumlah',
     ];
 
@@ -28,8 +29,14 @@ class CartItem extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function priceTier()
+
+    public function productVariant()
     {
-        return $this->belongsTo(PriceTier::class, 'harga_tingkat_id');
+        return $this->belongsTo(ProductVariant::class);
+    }
+
+    public function productVariantPack()
+    {
+        return $this->belongsTo(ProductVariantPack::class);
     }
 }
