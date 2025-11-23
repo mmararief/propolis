@@ -11,4 +11,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    host: true,                      // supaya bisa diakses dari jaringan luar (ngrok)
+    allowedHosts: [/\.ngrok-free\.app$/], // izinkan semua subdomain ngrok-free.app
+    // kalau mau sekaligus kunci port:
+    // port: 5173,
+  },
 })

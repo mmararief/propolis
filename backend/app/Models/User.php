@@ -24,9 +24,13 @@ class User extends Authenticatable
         'password',
         'no_hp',
         'role',
+        'province_id',
         'provinsi',
+        'city_id',
         'kabupaten_kota',
+        'district_id',
         'kecamatan',
+        'subdistrict_id',
         'kelurahan',
         'kode_pos',
         'alamat_lengkap',
@@ -60,10 +64,7 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
-    public function addresses()
-    {
-        return $this->hasMany(Address::class);
-    }
+
 
     public function cartItems()
     {

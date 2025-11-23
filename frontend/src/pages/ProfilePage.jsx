@@ -35,19 +35,18 @@ const ProfilePage = () => {
       const { data } = await api.get('/auth/profile');
       const userData = data.data;
       if (userData && !hasLoadedUserData.current) {
-        // Get address data from addresses[0] if available, otherwise from user directly
-        const defaultAddress = userData.addresses?.[0];
+        // Get address data from user directly
         const userForm = {
           username: userData.username || '',
           nama_lengkap: userData.nama_lengkap || '',
           email: userData.email || '',
-          no_hp: defaultAddress?.phone || userData.no_hp || '',
-          province_id: defaultAddress?.provinsi_id || userData.province_id || '',
-          city_id: defaultAddress?.city_id || userData.city_id || '',
-          district_id: defaultAddress?.district_id || userData.district_id || '',
-          subdistrict_id: defaultAddress?.subdistrict_id || userData.subdistrict_id || '',
-          postal_code: defaultAddress?.postal_code || userData.kode_pos || userData.postal_code || '',
-          alamat_lengkap: defaultAddress?.address || userData.alamat_lengkap || '',
+          no_hp: userData.no_hp || '',
+          province_id: userData.province_id || '',
+          city_id: userData.city_id || '',
+          district_id: userData.district_id || '',
+          subdistrict_id: userData.subdistrict_id || '',
+          postal_code: userData.kode_pos || userData.postal_code || '',
+          alamat_lengkap: userData.alamat_lengkap || '',
         };
         setForm(userForm);
 
@@ -75,18 +74,17 @@ const ProfilePage = () => {
       console.error('Failed to fetch user profile:', err);
       // Fallback to user from context
       if (user && !hasLoadedUserData.current) {
-        const defaultAddress = user.addresses?.[0];
         const userForm = {
           username: user.username || '',
           nama_lengkap: user.nama_lengkap || '',
           email: user.email || '',
-          no_hp: defaultAddress?.phone || user.no_hp || '',
-          province_id: defaultAddress?.provinsi_id || user.province_id || '',
-          city_id: defaultAddress?.city_id || user.city_id || '',
-          district_id: defaultAddress?.district_id || user.district_id || '',
-          subdistrict_id: defaultAddress?.subdistrict_id || user.subdistrict_id || '',
-          postal_code: defaultAddress?.postal_code || user.kode_pos || user.postal_code || '',
-          alamat_lengkap: defaultAddress?.address || user.alamat_lengkap || '',
+          no_hp: user.no_hp || '',
+          province_id: user.province_id || '',
+          city_id: user.city_id || '',
+          district_id: user.district_id || '',
+          subdistrict_id: user.subdistrict_id || '',
+          postal_code: user.kode_pos || user.postal_code || '',
+          alamat_lengkap: user.alamat_lengkap || '',
         };
         setForm(userForm);
         hasLoadedUserData.current = true;
@@ -211,7 +209,7 @@ const ProfilePage = () => {
 
       const { data } = await api.put('/auth/profile', payload);
       setMessage('Profil berhasil diperbarui!');
-      
+
       // Update user in context if needed
       if (data.data?.user) {
         window.location.reload(); // Simple way to refresh user data

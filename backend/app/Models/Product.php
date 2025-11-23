@@ -30,8 +30,7 @@ class Product extends Model
     ];
 
     protected $appends = [
-        'stok_available',
-        'batches',
+        // 'stok_available', // Removed to prevent N+1
     ];
 
     public function category()

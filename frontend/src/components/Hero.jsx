@@ -7,7 +7,13 @@ import shoppingBagIcon from '../assets/images/shopping-bag0.png'
 
 const Hero = () => {
   return (
-    <section className="relative w-full min-h-screen lg:h-[800px] mt-[100px] bg-gradient-to-b from-white via-white to-brand-red flex items-center overflow-hidden pb-20 lg:pb-0">
+    <section 
+      className="relative w-full min-h-screen lg:h-[690px] flex items-center overflow-hidden pb-20 lg:pb-0"
+      style={{
+        background: 'linear-gradient(180deg, rgba(255,255,255,1) 30%, rgba(210,0,26,1) 100%)',
+        boxShadow: 'inset 0px 1px 4px rgba(0,0,0,0.25)'
+      }}
+    >
       <div className="container mx-auto px-4 sm:px-8 lg:px-16 h-full">
         <div className="flex flex-col-reverse lg:flex-row items-center justify-between h-full gap-10 lg:gap-0">
 
@@ -22,7 +28,7 @@ const Hero = () => {
               suplemen bernutrisi — untuk mendukung keseimbangan tubuh dan gaya hidup modern.
             </p>
             <Link
-              to="/produk"
+              to="/products"
               className="w-full sm:w-[330px] h-16 sm:h-20 rounded-[50px] bg-[#D2001A] border-2 border-white flex items-center justify-center gap-3 hover:opacity-90 transition-opacity shadow-lg"
             >
               <img src={shoppingBagIcon} alt="" className="w-[24px] h-[24px] sm:w-[30px] sm:h-[30px]" />

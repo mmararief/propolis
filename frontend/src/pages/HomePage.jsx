@@ -64,22 +64,25 @@ const HomePage = () => {
   ];
 
   return (
-    <div className="relative w-full overflow-x-hidden bg-white pt-[100px]">
+    <div className="relative w-full overflow-x-hidden bg-white pt-[60px]">
       <Hero />
 
-      {/* ===== KEUNGGULAN SECTION ===== */}
-      <div className="relative w-full h-[590px]" style={{ backgroundColor: '#D2001A' }}>
-        <div className="relative w-full h-full max-w-[1920px] mx-auto">
+            {/* ===== KEUNGGULAN SECTION ===== */}
+      <div
+        className="relative w-full"
+        style={{ backgroundColor: '#D2001A' }}
+      >
+        <div className="relative w-full max-w-[1920px] mx-auto">
           {/* Desktop Layout */}
-          <div className="hidden xl:block">
-            <div className="absolute left-1/2 -translate-x-1/2 top-[70px] text-center">
+          <div className="hidden xl:block py-20">
+            <div className="text-center mb-16">
               <div className="text-[55px] font-ui font-normal text-white mb-2">
                 Selamat Datang di
               </div>
               <div className="text-[48px] font-brand font-normal text-white mb-2">
                 DANTE PROPOLIS
               </div>
-              <div className="flex items-center justify-center gap-2 mb-8">
+              <div className="flex items-center justify-center gap-2 mt-4">
                 <div className="w-[270px] h-0 border-t border-white"></div>
                 <img
                   src={beeSwarm}
@@ -90,36 +93,36 @@ const HomePage = () => {
               </div>
             </div>
 
-            <div className="absolute top-[260px] left-0 right-0 flex items-center justify-center gap-16 xl:gap-24">
-              <div className="flex flex-col items-center">
+            <div className="flex items-start justify-center gap-16 xl:gap-24">
+              <div className="flex flex-col items-center max-w-[317px]">
                 <img
                   src={rect140}
                   alt=""
                   className="w-[200px] h-[200px] object-cover mb-4"
                 />
-                <div className="text-white font-ui font-medium text-[30px] text-center max-w-[317px]">
+                <div className="text-white font-ui font-medium text-[30px] text-center">
                   Distributor Resmi
                 </div>
               </div>
 
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center max-w-[317px]">
                 <img
                   src={rect120}
                   alt=""
                   className="w-[200px] h-[200px] object-cover mb-4"
                 />
-                <div className="text-white font-ui font-medium text-[30px] text-center max-w-[317px]">
+                <div className="text-white font-ui font-medium text-[30px] text-center">
                   Produk Berkualitas
                 </div>
               </div>
 
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center max-w-[317px]">
                 <img
                   src={rect130}
                   alt=""
                   className="w-[200px] h-[200px] object-cover mb-4"
                 />
-                <div className="text-white font-ui font-medium text-[30px] text-center max-w-[317px]">
+                <div className="text-white font-ui font-medium text-[30px] text-center">
                   Layanan Terpercaya
                 </div>
               </div>
@@ -183,6 +186,7 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+
 
       {/* ===== BEST SELLERS SECTION ===== */}
       <ProdukTerlaris />
@@ -486,20 +490,31 @@ const HomePage = () => {
       </div>
 
       {/* ===== FOOTER ===== */}
-      <div className="relative w-full min-h-[450px] py-12 bg-gradient-to-b from-[#D2001A] via-[#D2001A] to-[#58000b]">
+      <div 
+        className="relative w-full min-h-[450px] py-12"
+        style={{
+          background: 'linear-gradient(180deg, rgba(210,0,26,1) 40%, rgba(88,0,11,1) 100%)'
+        }}
+      >
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-8 lg:px-16 xl:px-[150px]">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-16 mb-8">
             {/* Brand & Description */}
             <div className="w-full">
-              <div className="flex flex-col gap-1 mb-6">
-                <div className="font-brand text-2xl sm:text-3xl lg:text-[40px] leading-none text-white">
-                  <span>DANTE</span>
-                  <span className="ml-4 lg:ml-[85px]">PROPOLIS</span>
+              <div className="flex flex-col gap-1 mb-6 items-end">
+                <div 
+                  className="text-2xl sm:text-3xl lg:text-[40px] leading-none text-white text-right"
+                  style={{ fontFamily: "'Racing Sans One', Helvetica, sans-serif" }}
+                >
+                  <span>BRITISH </span>
+                  <span>PROPOLIS</span>
                 </div>
-                <div className="text-xs sm:text-sm lg:text-[12px] font-ui ml-8 lg:ml-[100px] text-white">
+                <div className="text-xs sm:text-sm lg:text-[12px] font-ui text-white text-right">
                   <span>Distributor Resmi </span>
-                  <span className="font-brand font-bold">BRITISH</span>
-                  <span className="font-brand font-bold ml-0.5">PROPOLIS</span>
+                  <span 
+                    style={{ fontFamily: "'Racing Sans One', Helvetica, sans-serif" }}
+                  >
+                    DANTE PROPOLIS
+                  </span>
                 </div>
               </div>
               <p className="text-base sm:text-lg lg:text-[24px] font-ui font-normal text-white text-justify">
@@ -509,7 +524,7 @@ const HomePage = () => {
             </div>
 
             {/* Navigasi Cepat */}
-            <div className="flex-1">
+            <div className="flex-1 flex flex-col items-center text-center">
               <h3 className="text-lg sm:text-xl lg:text-[24px] font-ui font-semibold text-white mb-6">Navigasi Cepat</h3>
               <div className="space-y-4">
                 <Link to="/" className="flex items-center gap-3 text-white hover:text-slate-200">
