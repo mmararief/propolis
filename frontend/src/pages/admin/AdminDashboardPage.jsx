@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 
 const AdminDashboardPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
   const LOW_STOCK_THRESHOLD = 10;
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -151,13 +154,33 @@ const AdminDashboardPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Dashboard Admin</h1>
-        <p className="text-slate-600">
-          Selamat Datang, {user?.name || 'Admin'}! Berikut adalah ringkasan aktivitas toko Anda hari ini.
-        </p>
+    <div className="space-y-4">
+      {/* Header + Aksi Cepat */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Dashboard Admin</h1>
+          <p className="text-slate-600">
+            Selamat Datang, {user?.name || 'Admin'}! Berikut adalah ringkasan aktivitas toko Anda hari ini.
+          </p>
+        </div>
+
+        {/* Aksi Cepat */}
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/admin/orders/manual')} // ganti path kalau berbeda
+            className="inline-flex items-center justify-center rounded-md bg-[#D2001A] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition"
+          >
+            + Tambah Transaksi
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/reports')}
+            className="inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 transition"
+          >
+            Cetak Laporan
+          </button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
