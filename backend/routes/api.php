@@ -24,6 +24,8 @@ Route::get('/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::cla
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/forgot-password', [\App\Http\Controllers\ForgotPasswordController::class, 'sendResetLinkEmail']);
+Route::post('/auth/reset-password', [\App\Http\Controllers\ForgotPasswordController::class, 'reset']);
 
 Route::get('/shipping/provinces', [ShippingController::class, 'provinces']);
 Route::get('/shipping/cities/{provinceId}', [ShippingController::class, 'cities']);

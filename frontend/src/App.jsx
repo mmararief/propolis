@@ -14,6 +14,8 @@ import OrderSuccessPage from "./pages/OrderSuccessPage";
 import OrderLookupPage from "./pages/OrderLookupPage";
 import UploadProofPage from "./pages/UploadProofPage";
 import ProfilePage from "./pages/ProfilePage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminLayout from "./components/AdminLayout";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminCategoriesPage from "./pages/admin/AdminCategoriesPage";
@@ -52,6 +54,8 @@ const App = () => (
                 <Route path="/products/:id" element={<ProductDetailPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route
                   path="/cart"
                   element={
