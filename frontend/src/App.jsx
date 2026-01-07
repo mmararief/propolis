@@ -42,14 +42,7 @@ const App = () => (
             <main className="flex-1">
               <Routes>
                 <Route path="/" element={<HomePage />} />
-                <Route
-                  path="/about"
-                  element={
-                    <div className="container-layout py-8">
-                      <AboutPage />
-                    </div>
-                  }
-                />
+                <Route path="/about" element={<AboutPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/products/:id" element={<ProductDetailPage />} />
                 <Route path="/login" element={<LoginPage />} />

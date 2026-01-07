@@ -549,7 +549,7 @@ const AdminReportsPage = () => {
         },
       });
       const historyData = data.data ?? data ?? { products: [], segments: [] };
-      
+
       // Helper function untuk grouping dan sorting dari data yang baru diambil
       const getGroupedAndSortedFromData = (products) => {
         const validItems = (products || []).filter(
@@ -592,7 +592,7 @@ const AdminReportsPage = () => {
 
         return sortedGroups;
       };
-      
+
       // Prepare Excel data dengan format matrix
       const sortedGroups = getGroupedAndSortedFromData(historyData.products);
       const excelData = [];
@@ -604,7 +604,7 @@ const AdminReportsPage = () => {
         const firstItem = firstVariant || items.find(item => item.type === 'product');
         const variants = items.filter(item => item.type === 'variant');
         const hasVariants = variants.length > 0;
-        
+
         if (!hasVariants) {
           header1.push(firstItem.nama_produk);
         } else {
@@ -667,7 +667,7 @@ const AdminReportsPage = () => {
       sortedGroups.forEach(([, items]) => {
         const variants = items.filter(item => item.type === 'variant');
         const hasVariants = variants.length > 0;
-        
+
         if (hasVariants && variants.length > 1) {
           ws[`!merges`] = ws[`!merges`] || [];
           ws[`!merges`].push({
@@ -979,9 +979,9 @@ const AdminReportsPage = () => {
       <section className="card space-y-4">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-base font-semibold text-slate-900">Riwayat Stok (Mirip Spreadsheet)</p>
+            <p className="text-base font-semibold text-slate-900">Riwayat Stok</p>
             <p className="text-sm text-slate-500">
-              Pilih periode dan interval untuk melihat stok setiap produk seperti format Excel yang biasa digunakan.
+              Pilih periode dan interval untuk melihat stok setiap produk.
             </p>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
