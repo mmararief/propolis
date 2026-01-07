@@ -111,15 +111,18 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
+            'email' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
         /** @var User|null $user */
-        $user = User::where('email', $credentials['email'])->first();
+        // Try to find user by email or username
+        $user = User::where('email', $credentials['email'])
+            ->orWhere('username', $credentials['email'])
+            ->first();
 
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            return $this->fail('Email atau password salah', 401);
+            return $this->fail('Username/Email atau password salah', 401);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;

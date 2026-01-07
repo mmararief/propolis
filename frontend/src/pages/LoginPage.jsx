@@ -84,10 +84,10 @@ const LoginPage = () => {
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Email Input */}
+              {/* Username/Email Input */}
               <div>
                 <input
-                  type="email"
+                  type="text"
                   name="email"
                   placeholder="Username / Email"
                   value={form.email}

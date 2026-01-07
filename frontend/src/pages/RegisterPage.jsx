@@ -28,6 +28,7 @@ const RegisterPage = () => {
   const [cities, setCities] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [subdistricts, setSubdistricts] = useState([]);
+  const [phoneError, setPhoneError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -133,6 +134,21 @@ const RegisterPage = () => {
       subdistrict_id: value,
       subdistrict_name: selected?.subdistrict_name ?? selected?.name ?? selected?.subdistrict ?? '',
     }));
+  };
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+    // Only allow numbers - filter out any non-numeric characters
+    const numericValue = value.replace(/[^0-9]/g, '');
+    
+    // Check if original value contains non-numeric characters
+    if (value !== numericValue) {
+      setPhoneError('Nomor telepon hanya boleh berisi angka');
+    } else {
+      setPhoneError('');
+    }
+    
+    setForm({ ...form, no_hp: numericValue });
   };
 
   const handleSubmit = async (e) => {
@@ -280,18 +296,23 @@ const RegisterPage = () => {
 
                   <div>
                     <input
-                      type="tel"
+                      type="text"
                       placeholder="No. Telp"
                       value={form.no_hp}
-                      onChange={(e) => setForm({ ...form, no_hp: e.target.value })}
+                      onChange={handlePhoneChange}
                       className="w-full px-4 py-3 border-2 rounded-lg font-ui font-normal text-base outline-none transition-all"
-                      style={inputStyle}
+                      style={phoneError ? { ...inputStyle, borderColor: '#D2001A' } : inputStyle}
                       onFocus={(e) => Object.assign(e.target.style, inputFocusStyle)}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#D2001A';
+                        e.target.style.borderColor = phoneError ? '#D2001A' : '#D2001A';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
+                    {phoneError && (
+                      <p className="text-sm mt-1" style={{ color: '#D2001A' }}>
+                        {phoneError}
+                      </p>
+                    )}
                   </div>
 
                   <div>
