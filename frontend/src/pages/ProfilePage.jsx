@@ -22,6 +22,7 @@ const ProfilePage = () => {
   const [cities, setCities] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [subdistricts, setSubdistricts] = useState([]);
+  const [originalForm, setOriginalForm] = useState(null); // keep last saved data
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
@@ -49,6 +50,7 @@ const ProfilePage = () => {
           alamat_lengkap: userData.alamat_lengkap || '',
         };
         setForm(userForm);
+        setOriginalForm(userForm);
 
         // Store previous values
         previousProvinceId.current = userForm.province_id;
@@ -87,6 +89,7 @@ const ProfilePage = () => {
           alamat_lengkap: user.alamat_lengkap || '',
         };
         setForm(userForm);
+        setOriginalForm(userForm);
         hasLoadedUserData.current = true;
       }
     }
@@ -189,10 +192,27 @@ const ProfilePage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setError(null);
     setMessage(null);
 
+    // Require address selections and essential fields before saving
+    if (
+      !form.province_id ||
+      !form.city_id ||
+      !form.district_id ||
+      !form.subdistrict_id ||
+      !form.postal_code ||
+      !form.alamat_lengkap
+    ) {
+      setError('Harap lengkapi provinsi, kota/kabupaten, kecamatan, kelurahan, kode pos, dan alamat lengkap.');
+      // Revert to last known saved data so existing info isn't wiped in the form
+      if (originalForm) {
+        setForm(originalForm);
+      }
+      return;
+    }
+
+    setSaving(true);
     try {
       const payload = {
         username: form.username,
@@ -209,6 +229,7 @@ const ProfilePage = () => {
 
       const { data } = await api.put('/auth/profile', payload);
       setMessage('Profil berhasil diperbarui!');
+      setOriginalForm(form); // keep latest saved data
 
       // Update user in context if needed
       if (data.data?.user) {
@@ -216,6 +237,10 @@ const ProfilePage = () => {
       }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Gagal memperbarui profil');
+      // Restore previous data to avoid losing existing info
+      if (originalForm) {
+        setForm(originalForm);
+      }
     } finally {
       setSaving(false);
     }
@@ -332,6 +357,7 @@ const ProfilePage = () => {
                       }}
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
+                    required
                     >
                       <option value="">Pilih provinsi</option>
                       {provinces.map((province) => {
@@ -360,6 +386,7 @@ const ProfilePage = () => {
                       disabled={!cities.length}
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
+                    required
                     >
                       <option value="">Pilih kota/kabupaten</option>
                       {cities.map((city) => {
@@ -387,6 +414,7 @@ const ProfilePage = () => {
                       disabled={!districts.length}
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
+                    required
                     >
                       <option value="">Pilih kecamatan</option>
                       {districts.map((district) => {
@@ -408,6 +436,7 @@ const ProfilePage = () => {
                       disabled={!subdistricts.length}
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
+                    required
                     >
                       <option value="">Pilih kelurahan</option>
                       {subdistricts.map((sub) => {
@@ -430,6 +459,7 @@ const ProfilePage = () => {
                       placeholder="Pilih kode pos"
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
+                    required
                     />
                   </label>
                   <label className="text-sm font-ui font-semibold text-gray-700 md:col-span-2">
@@ -441,6 +471,7 @@ const ProfilePage = () => {
                       placeholder="Nama jalan, Gedung, No.Rumah / Blok"
                       className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0"
                       style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
+                    required
                     />
                   </label>
                 </div>
