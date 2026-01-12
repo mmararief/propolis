@@ -17,7 +17,8 @@ const ForgotPasswordPage = () => {
         setMessage('');
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/auth/forgot-password', { email });
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+            const response = await axios.post(`${apiUrl}/auth/forgot-password`, { email });
             setMessage(response.data.message || 'Kami telah mengirimkan tautan reset password ke email Anda!');
         } catch (err) {
             setError(err.response?.data?.message || 'Terjadi kesalahan. Silakan coba lagi.');

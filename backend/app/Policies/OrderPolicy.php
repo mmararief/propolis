@@ -12,7 +12,8 @@ class OrderPolicy
      */
     public function view(User $user, Order $order): bool
     {
-        return $user->isAdmin() || $order->user_id === $user->id;
+        // Cast both to int to avoid string/int mismatch issues
+        return $user->isAdmin() || (int) $order->user_id === (int) $user->id;
     }
 
     /**
@@ -31,5 +32,3 @@ class OrderPolicy
         return $user->isAdmin();
     }
 }
-
-

@@ -11,11 +11,11 @@
     },
     "servers": [
         {
-            "url": "https://1c552ad702a8.ngrok-free.app/api",
+            "url": "http://localhost:8000/api",
             "description": "API Root"
         },
         {
-            "url": "https://1c552ad702a8.ngrok-free.app/api"
+            "url": "http://localhost:8000/api"
         }
     ],
     "paths": {
@@ -356,6 +356,38 @@
                 "responses": {
                     "200": {
                         "description": "Job sync tracking sudah dijalankan"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/admin/orders/{id}/cancel": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Batalkan pesanan oleh admin",
+                "operationId": "27703945ed199c12a38d272c363be221",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pesanan dibatalkan"
+                    },
+                    "422": {
+                        "description": "Status tidak valid untuk dibatalkan"
                     }
                 },
                 "security": [
@@ -2221,6 +2253,96 @@
                         "sanctum": []
                     }
                 ]
+            }
+        },
+        "/auth/forgot-password": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Kirim link reset password",
+                "operationId": "f7e3e5abbeac5d3c9b229e00871a01af",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Link reset password terkirim"
+                    },
+                    "404": {
+                        "description": "Email tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                }
+            }
+        },
+        "/auth/reset-password": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Reset password dengan token",
+                "operationId": "719ce108f6cdfb5b5ed622868ec8c764",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "token",
+                                    "email",
+                                    "password",
+                                    "password_confirmation"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "minLength": 8
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "format": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Password berhasil direset"
+                    },
+                    "422": {
+                        "description": "Token tidak valid atau expired"
+                    }
+                }
             }
         },
         "/orders/me": {

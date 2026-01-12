@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
-use App\Models\PriceTier;
+
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ProductVariantPack;
@@ -82,7 +82,6 @@ class DatabaseSeeder extends Seeder
                         [
                             'label' => $pack['label'],
                             'harga_pack' => $pack['price'],
-                            'stok' => $pack['stok'],
                             'status' => 'aktif',
                         ]
                     );
@@ -92,30 +91,7 @@ class DatabaseSeeder extends Seeder
             return $product;
         });
 
-        // Create global price tiers (berlaku untuk semua produk)
-        // Harga untuk 1 botol (harga normal)
-        PriceTier::updateOrCreate(
-            ['product_id' => null, 'min_jumlah' => 1],
-            ['max_jumlah' => 2, 'harga_total' => 250000, 'label' => '1 Botol']
-        );
 
-        // Harga untuk 3 botol (lebih murah per botol)
-        PriceTier::updateOrCreate(
-            ['product_id' => null, 'min_jumlah' => 3],
-            ['max_jumlah' => 4, 'harga_total' => 700000, 'label' => '3 Botol']
-        );
-
-        // Harga untuk 5 botol (lebih murah lagi per botol)
-        PriceTier::updateOrCreate(
-            ['product_id' => null, 'min_jumlah' => 5],
-            ['max_jumlah' => 9, 'harga_total' => 1100000, 'label' => '5 Botol']
-        );
-
-        // Harga untuk 10+ botol
-        PriceTier::updateOrCreate(
-            ['product_id' => null, 'min_jumlah' => 10],
-            ['max_jumlah' => null, 'harga_total' => 2000000, 'label' => '10+ Botol']
-        );
 
         foreach ($products as $product) {
             $product->forceFill([

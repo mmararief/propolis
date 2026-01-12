@@ -48,7 +48,6 @@ class ProductVariantPackController extends Controller
      *             @OA\Property(property="label", type="string"),
      *             @OA\Property(property="pack_size", type="integer", example=3),
      *             @OA\Property(property="harga_pack", type="number", format="float"),
-     *             @OA\Property(property="stok", type="integer"),
      *             @OA\Property(property="status", type="string", enum={"aktif","nonaktif"})
      *         )
      *     ),
@@ -67,7 +66,6 @@ class ProductVariantPackController extends Controller
             'pack_size' => ['required', 'integer', 'min:1'],
             'sku_pack' => ['nullable', 'string', 'max:50', 'unique:product_variant_packs,sku_pack'],
             'harga_pack' => ['nullable', 'numeric', 'min:0'],
-            'stok' => ['nullable', 'integer', 'min:0'],
             'status' => ['nullable', 'in:aktif,nonaktif'],
         ]);
 
@@ -75,7 +73,6 @@ class ProductVariantPackController extends Controller
         // Stok pack langsung dari produk menggunakan stok produk
         $pack = $variant->packs()->create([
             ...$data,
-            'stok' => 0,
             'status' => $data['status'] ?? 'aktif',
         ]);
 

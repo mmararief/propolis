@@ -8,9 +8,12 @@ import { getProductImageUrl } from '../utils/imageHelper';
 const originCityId = import.meta.env.VITE_ORIGIN_CITY_ID ?? 149;
 
 const CheckoutPage = () => {
-  const { items, total, clearCart, totalWeight } = useCart();
+  const { clearCart, getSelectedItems, selectedTotal, selectedWeight, selectedCount } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Get only selected items for checkout
+  const checkoutItems = getSelectedItems();
   const [form, setForm] = useState({
     destination_city_id: '',
     destination_district_id: '',
@@ -48,7 +51,8 @@ const CheckoutPage = () => {
       setError('Alamat tujuan belum lengkap (kecamatan belum tersedia).');
       return;
     }
-    const weight = Math.max(totalWeight, 1000);
+    // Use selected weight instead of total weight
+    const weight = Math.max(selectedWeight, 1000);
     setShippingLoading(true);
     setError(null);
     try {
@@ -105,8 +109,8 @@ const CheckoutPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (items.length === 0) {
-      setError('Keranjang kosong');
+    if (checkoutItems.length === 0) {
+      setError('Tidak ada produk yang dipilih untuk checkout');
       return;
     }
     const cityId = form.destination_city_id || user?.city_id;
@@ -131,7 +135,7 @@ const CheckoutPage = () => {
         destination_city_id: Number(cityId),
         destination_district_id: Number(districtId),
         destination_subdistrict_id: subdistrictId ? Number(subdistrictId) : undefined,
-        items: items.map((item) => {
+        items: checkoutItems.map((item) => {
           // Calculate pack_qty if pack exists (jumlah paket yang dibeli)
           let packQty = null;
           if (item.product_variant_pack?.pack_size) {
@@ -161,11 +165,11 @@ const CheckoutPage = () => {
     return `Rp ${price.toLocaleString('id-ID')}`;
   };
 
-  const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
-  const grandTotal = total + (form.ongkos_kirim || 0);
+  const totalItems = selectedCount;
+  const grandTotal = selectedTotal + (form.ongkos_kirim || 0);
 
   // Enrich items with pack pricing info
-  const enrichedItems = items.map((item) => {
+  const enrichedItems = checkoutItems.map((item) => {
     // Calculate price per pack and pack info
     let packPrice = 0;
     let packSize = 1;
@@ -238,9 +242,9 @@ const CheckoutPage = () => {
           CHECKOUT
         </h1>
 
-        {items.length === 0 ? (
+        {checkoutItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <p className="text-slate-600 text-lg mb-4">Keranjang kamu masih kosong.</p>
+            <p className="text-slate-600 text-lg mb-4">Tidak ada produk yang dipilih untuk checkout.</p>
             <Link
               to="/products"
               className="inline-block px-6 py-3 rounded-lg text-white font-ui font-semibold text-[16px] hover:opacity-90 transition-opacity"

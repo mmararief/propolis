@@ -4,31 +4,46 @@ import { getProductImageUrl } from '../utils/imageHelper';
 import { FaTrash } from 'react-icons/fa';
 
 const CartPage = () => {
-  const { items, updateQty, removeItem, clearCart, total } = useCart();
+  const {
+    items,
+    updateQty,
+    removeItem,
+    clearCart,
+    selectedItems,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    isAllSelected,
+    selectedTotal,
+    selectedCount
+  } = useCart();
   const navigate = useNavigate();
 
   const formatPrice = (price) => {
     return `Rp ${price.toLocaleString('id-ID')}`;
   };
 
-  const handleQuantityChange = (productId, delta) => {
-    const item = items.find((item) => item.product.id === productId);
-    if (item) {
-      const newQty = item.qty + delta;
-      if (newQty > 0) {
-        updateQty(productId, newQty);
-      }
+  const handleQuantityChange = (cartItemId, newQty) => {
+    if (newQty > 0) {
+      updateQty(cartItemId, newQty);
     }
   };
 
   const handleCheckout = () => {
-    if (items.length > 0) {
+    if (selectedItems.size > 0) {
       navigate('/checkout');
+    } else {
+      alert('Pilih minimal satu produk untuk checkout');
     }
   };
 
-  const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
-  const estimatedTotal = total;
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      clearSelection();
+    } else {
+      selectAll();
+    }
+  };
 
   return (
     <div className="relative bg-white min-h-screen overflow-x-hidden pt-[100px] pb-20">
@@ -80,7 +95,13 @@ const CartPage = () => {
                   style={{ backgroundColor: '#D2001A' }}
                 >
                   <div className="col-span-1">
-                    <input type="checkbox" className="rounded border-gray-300" />
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 w-5 h-5 cursor-pointer"
+                      checked={isAllSelected}
+                      onChange={handleSelectAll}
+                      title="Pilih Semua"
+                    />
                   </div>
                   <div className="col-span-4 font-ui font-semibold">Produk</div>
                   <div className="col-span-2 text-center font-ui font-semibold">Harga</div>
@@ -95,7 +116,7 @@ const CartPage = () => {
                   let packPrice = 0;
                   let packSize = 1;
                   let packQuantity = item.qty; // Default to qty if no pack
-                  
+
                   if (item.product_variant_pack?.harga_pack) {
                     packSize = item.product_variant_pack.pack_size || 1;
                     packPrice = item.product_variant_pack.harga_pack;
@@ -113,6 +134,7 @@ const CartPage = () => {
                   const variantLabel = item.product_variant?.tipe || '';
                   const packLabel = item.product_variant_pack?.label || '';
                   const totalPrice = packPrice * packQuantity; // Harga paket × jumlah paket
+                  const isSelected = selectedItems.has(item.id);
 
                   // Handler untuk update quantity (update dalam satuan paket)
                   const handlePackQuantityChange = (delta) => {
@@ -120,104 +142,110 @@ const CartPage = () => {
                     if (newPackQty >= 1) {
                       // Kirim jumlah botol total ke backend
                       const newQty = newPackQty * packSize;
-                      handleQuantityChange(item.product.id, newQty - item.qty);
+                      handleQuantityChange(item.id, newQty);
                     }
                   };
 
                   return (
-                  <div
-                    key={`${item.id || item.product.id}-${item.product_variant?.id || ''}-${item.product_variant_pack?.id || ''}`}
-                    className="grid grid-cols-12 border-b p-4 items-center hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="col-span-1">
-                      <input type="checkbox" className="rounded border-gray-300" />
-                    </div>
-                    <div className="col-span-4">
-                      <div className="flex gap-4">
-                        <div className="w-20 h-20 bg-[#f1f1f1] rounded flex items-center justify-center overflow-hidden relative">
-                          {item.product?.gambar ? (
-                            <img
-                              src={getProductImageUrl(item.product.gambar)}
-                              alt={item.product.nama_produk}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <span className={`text-xs text-slate-400 ${item.product?.gambar ? 'hidden' : ''}`}>Gambar</span>
-                        </div>
-                        <div>
-                          <h3 className="font-ui font-medium text-gray-900 mb-1">
-                            {item.product?.nama_produk || 'Produk'}
-                          </h3>
-                          {(variantLabel || packLabel) && (
-                            <div className="mt-1 text-xs text-slate-600 space-y-0.5">
-                              {variantLabel && (
-                                <p>
-                                  <span className="font-semibold">Varian:</span> {variantLabel}
-                                </p>
-                              )}
-                              {packLabel && (
-                                <p>
-                                  <span className="font-semibold">Paket:</span> {packLabel}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-span-2 text-center font-ui text-gray-900">
-                      {formatPrice(packPrice)}
-                    </div>
-                    <div className="col-span-2">
-                      <div className="flex items-center justify-center space-x-2">
-                        <button
-                          onClick={() => handlePackQuantityChange(-1)}
-                          className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors font-ui font-bold text-gray-700"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          value={packQuantity}
-                          readOnly
-                          className="w-12 text-center border rounded font-ui font-semibold"
-                        />
-                        <button
-                          onClick={() => handlePackQuantityChange(1)}
-                          className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors font-ui font-bold text-gray-700"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
                     <div
-                      className="col-span-2 text-center font-ui font-medium"
-                      style={{ color: '#D2001A' }}
+                      key={`${item.id || item.product.id}-${item.product_variant?.id || ''}-${item.product_variant_pack?.id || ''}`}
+                      className={`grid grid-cols-12 border-b p-4 items-center transition-colors ${isSelected ? 'bg-red-50' : 'hover:bg-gray-50'}`}
                     >
-                      {formatPrice(totalPrice)}
-                    </div>
-                    <div className="col-span-1 text-center">
-                      <button
-                        onClick={() => {
-                          if (window.confirm('Apakah Anda yakin ingin menghapus produk ini dari keranjang?')) {
-                            removeItem(item.id);
-                          }
-                        }}
-                        className="text-red-500 hover:text-red-700 transition-colors p-2 rounded hover:bg-red-50"
-                        title="Hapus produk"
+                      <div className="col-span-1">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 w-5 h-5 cursor-pointer"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(item.id)}
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <div className="flex gap-4">
+                          <div className="w-20 h-20 bg-[#f1f1f1] rounded flex items-center justify-center overflow-hidden relative">
+                            {item.product?.gambar ? (
+                              <img
+                                src={getProductImageUrl(item.product.gambar)}
+                                alt={item.product.nama_produk}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <span className={`text-xs text-slate-400 ${item.product?.gambar ? 'hidden' : ''}`}>Gambar</span>
+                          </div>
+                          <div>
+                            <h3 className="font-ui font-medium text-gray-900 mb-1">
+                              {item.product?.nama_produk || 'Produk'}
+                            </h3>
+                            {(variantLabel || packLabel) && (
+                              <div className="mt-1 text-xs text-slate-600 space-y-0.5">
+                                {variantLabel && (
+                                  <p>
+                                    <span className="font-semibold">Varian:</span> {variantLabel}
+                                  </p>
+                                )}
+                                {packLabel && (
+                                  <p>
+                                    <span className="font-semibold">Paket:</span> {packLabel}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-span-2 text-center font-ui text-gray-900">
+                        {formatPrice(packPrice)}
+                      </div>
+                      <div className="col-span-2">
+                        <div className="flex items-center justify-center space-x-2">
+                          <button
+                            onClick={() => handlePackQuantityChange(-1)}
+                            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors font-ui font-bold text-gray-700"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            value={packQuantity}
+                            readOnly
+                            className="w-12 text-center border rounded font-ui font-semibold"
+                          />
+                          <button
+                            onClick={() => handlePackQuantityChange(1)}
+                            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors font-ui font-bold text-gray-700"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        className="col-span-2 text-center font-ui font-medium"
+                        style={{ color: '#D2001A' }}
                       >
-                        <FaTrash className="w-4 h-4" />
-                      </button>
+                        {formatPrice(totalPrice)}
+                      </div>
+                      <div className="col-span-1 text-center">
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Apakah Anda yakin ingin menghapus produk ini dari keranjang?')) {
+                              removeItem(item.id);
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-700 transition-colors p-2 rounded hover:bg-red-50"
+                          title="Hapus produk"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );})}
+                  );
+                })}
 
                 {/* Delete All Button */}
-                <div className="p-4 border-t">
+                <div className="p-4 border-t flex justify-between items-center">
                   <button
                     onClick={clearCart}
                     className="font-ui font-medium hover:underline transition-colors"
@@ -225,6 +253,9 @@ const CartPage = () => {
                   >
                     Hapus Semua Produk
                   </button>
+                  <span className="text-sm text-gray-500">
+                    {selectedItems.size} dari {items.length} produk dipilih
+                  </span>
                 </div>
               </div>
             </div>
@@ -237,12 +268,12 @@ const CartPage = () => {
                 </h2>
                 <div className="space-y-4">
                   <div className="flex justify-between font-ui text-gray-700">
-                    <span>Jumlah Produk</span>
-                    <span>{totalItems}</span>
+                    <span>Produk Dipilih</span>
+                    <span>{selectedCount} item</span>
                   </div>
                   <div className="flex justify-between font-ui text-gray-700">
                     <span>Perkiraan Total Harga</span>
-                    <span>{formatPrice(estimatedTotal || total)}</span>
+                    <span>{formatPrice(selectedTotal)}</span>
                   </div>
                   <hr className="border-gray-200" />
                   <div
@@ -250,14 +281,15 @@ const CartPage = () => {
                     style={{ color: '#D2001A' }}
                   >
                     <span>Total</span>
-                    <span>{formatPrice(estimatedTotal || total)}</span>
+                    <span>{formatPrice(selectedTotal)}</span>
                   </div>
                   <button
                     onClick={handleCheckout}
-                    className="w-full py-3 rounded-lg font-ui font-semibold text-[16px] text-white hover:opacity-90 transition-opacity"
+                    disabled={selectedItems.size === 0}
+                    className="w-full py-3 rounded-lg font-ui font-semibold text-[16px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: '#D2001A' }}
                   >
-                    Checkout
+                    Checkout ({selectedItems.size})
                   </button>
                 </div>
               </div>
@@ -270,3 +302,4 @@ const CartPage = () => {
 };
 
 export default CartPage;
+

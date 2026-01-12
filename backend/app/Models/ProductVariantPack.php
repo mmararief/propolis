@@ -18,8 +18,6 @@ class ProductVariantPack extends Model
         'pack_size',
         'sku_pack',
         'harga_pack',
-        'stok',
-        'stok_reserved',
         'status',
     ];
 

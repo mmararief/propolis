@@ -73,17 +73,34 @@ class CartController extends Controller
 
         if ($packId) {
             $pack = ProductVariantPack::findOrFail($packId);
-            if ($variant && $pack->product_variant_id !== $variant->id) {
-                return $this->fail('Paket tidak sesuai dengan varian yang dipilih', 422);
-            }
-            if (! $variant) {
-                // ensure pack belongs to product
-                $packVariant = $pack->variant()->first();
-                if (! $packVariant || $packVariant->product_id !== $product->id) {
+
+            // Case 1: Pack is directly from product (no variant)
+            if ($pack->product_id && !$pack->product_variant_id) {
+                // Validate pack belongs to the product
+                if ((int) $pack->product_id !== (int) $product->id) {
+                    \Illuminate\Support\Facades\Log::error("Cart Mismatch: Pack ID {$pack->id} (Product {$pack->product_id}) does not match Request Product ID {$product->id}");
                     return $this->fail('Paket tidak sesuai dengan produk yang dipilih', 422);
                 }
-                $variant = $packVariant;
-                $variantId = $variant->id;
+                // For product-based packs, variant should be null
+                $variant = null;
+                $variantId = null;
+            }
+            // Case 2: Pack is from a variant
+            else if ($pack->product_variant_id) {
+                if ($variant && (int) $pack->product_variant_id !== (int) $variant->id) {
+                    \Illuminate\Support\Facades\Log::error("Cart Mismatch: Pack ID {$pack->id} (Variant {$pack->product_variant_id}) does not match Request Variant ID {$variant->id}");
+                    return $this->fail('Paket tidak sesuai dengan varian yang dipilih', 422);
+                }
+                if (!$variant) {
+                    // Load variant from pack
+                    $packVariant = $pack->variant()->first();
+                    if (!$packVariant || (int) $packVariant->product_id !== (int) $product->id) {
+                        \Illuminate\Support\Facades\Log::error("Cart Mismatch: Pack ID {$pack->id} variant belongs to different product");
+                        return $this->fail('Paket tidak sesuai dengan produk yang dipilih', 422);
+                    }
+                    $variant = $packVariant;
+                    $variantId = $variant->id;
+                }
             }
         }
 

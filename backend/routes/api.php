@@ -19,8 +19,7 @@ Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories', [ProductController::class, 'categories']);
 
-// Public access to global price tiers
-Route::get('/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'index']);
+
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -81,11 +80,7 @@ Route::middleware(['auth:sanctum', 'can:admin'])->group(function () {
     Route::post('/admin/run-reservation-release', [AdminOrderController::class, 'runReservationRelease']);
     Route::post('/admin/run-tracking-sync', [AdminOrderController::class, 'runTrackingSync']);
 
-    // Global Price Tiers Management
-    Route::get('/admin/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'index']);
-    Route::post('/admin/price-tiers', [\App\Http\Controllers\Admin\PriceTierController::class, 'store']);
-    Route::put('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'update']);
-    Route::delete('/admin/price-tiers/{id}', [\App\Http\Controllers\Admin\PriceTierController::class, 'destroy']);
+
 
     Route::get('/reports/stock', [ReportController::class, 'stockReport']);
     Route::get('/reports/sales-detail', [ReportController::class, 'salesDetail']);

@@ -16,42 +16,7 @@ use Illuminate\Validation\ValidationException;
 class ReportController extends Controller
 {
 
-    /**
-     * @OA\Get(
-     *     path="/admin/low-stock-products",
-     *     tags={"Admin"},
-     *     summary="Produk dengan stok rendah",
-     *     security={{"sanctum": {}}},
-     *     @OA\Parameter(name="threshold", in="query", @OA\Schema(type="integer", default=10)),
-     *     @OA\Response(response=200, description="Daftar produk stok rendah")
-     * )
-     */
-    public function lowStockProducts(Request $request)
-    {
-        $this->authorize('admin');
 
-        $threshold = $request->integer('threshold', 10);
-
-        $products = Product::query()
-            ->select(['id', 'nama_produk', 'sku', 'stok', 'stok_reserved', 'status'])
-            ->where('status', 'aktif')
-            ->havingRaw('(stok - COALESCE(stok_reserved, 0)) <= ?', [$threshold])
-            ->havingRaw('(stok - COALESCE(stok_reserved, 0)) > 0')
-            ->orderByRaw('(stok - COALESCE(stok_reserved, 0)) ASC')
-            ->limit(20)
-            ->get()
-            ->map(function (Product $product) {
-                return [
-                    'id' => $product->id,
-                    'nama_produk' => $product->nama_produk,
-                    'sku' => $product->sku,
-                    'stok_available' => $product->stok_available,
-                    'status' => $product->status,
-                ];
-            });
-
-        return $this->success($products);
-    }
 
     /**
      * @OA\Get(

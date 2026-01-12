@@ -61,6 +61,11 @@ class OrderController extends Controller
             return $this->fail('Pesanan tidak ditemukan', 404);
         }
 
+        // Debugging for production 403 error
+        if (!$request->user()->isAdmin() && $order->user_id !== $request->user()->id) {
+            \Illuminate\Support\Facades\Log::error("Order Auth Failed: User {$request->user()->id} tried to view Order {$order->id} (Owner: {$order->user_id})");
+        }
+
         $this->authorize('view', $order);
 
         // Cek dan update status jika order sudah expired
@@ -138,7 +143,7 @@ class OrderController extends Controller
             return $this->fail('Pesanan tidak ditemukan', 404);
         }
 
-        if ($order->user_id !== $request->user()->id) {
+        if ((int) $order->user_id !== (int) $request->user()->id) {
             return $this->fail('Anda tidak berhak mengubah pesanan ini', 403);
         }
 
@@ -200,7 +205,7 @@ class OrderController extends Controller
             return $this->fail('Pesanan tidak ditemukan', 404);
         }
 
-        if ($order->user_id !== $request->user()->id) {
+        if ((int) $order->user_id !== (int) $request->user()->id) {
             return $this->fail('Anda tidak berhak mengubah pesanan ini', 403);
         }
 
@@ -263,7 +268,7 @@ class OrderController extends Controller
             return $this->fail('Pesanan tidak ditemukan', 404);
         }
 
-        if ($order->user_id !== $request->user()->id) {
+        if ((int) $order->user_id !== (int) $request->user()->id) {
             return $this->fail('Anda tidak berhak mengubah pesanan ini', 403);
         }
 

@@ -79,7 +79,6 @@ class ProductPackController extends Controller
             'product_id' => $productId,
             'product_variant_id' => null,
             ...$data,
-            'stok' => 0,
             'status' => $data['status'] ?? 'aktif',
         ]);
 

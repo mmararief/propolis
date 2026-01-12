@@ -149,9 +149,19 @@ class CheckoutController extends Controller
             if (! empty($payload['product_variant_pack_id'])) {
                 $pack = ProductVariantPack::findOrFail($payload['product_variant_pack_id']);
 
-                // Jika pack dari variant
-                if ($pack->product_variant_id) {
-                    if ($variant && $pack->product_variant_id !== $variant->id) {
+                // Case 1: Pack langsung dari produk (tanpa variant)
+                if ($pack->product_id && !$pack->product_variant_id) {
+                    // Pastikan pack sesuai dengan produk
+                    if ((int) $pack->product_id !== (int) $product->id) {
+                        throw ValidationException::withMessages([
+                            'items' => ['Paket tidak sesuai dengan produk yang dipilih.'],
+                        ]);
+                    }
+                    // Untuk pack langsung dari product, variant tetap null
+                }
+                // Case 2: Pack dari variant
+                else if ($pack->product_variant_id) {
+                    if ($variant && (int) $pack->product_variant_id !== (int) $variant->id) {
                         throw ValidationException::withMessages([
                             'items' => ['Varian jumlah tidak sesuai dengan varian produk.'],
                         ]);
@@ -161,25 +171,17 @@ class CheckoutController extends Controller
                     if (! $variant) {
                         $variant = ProductVariant::findOrFail($pack->product_variant_id);
 
-                        if ($variant->product_id !== $product->id) {
+                        if ((int) $variant->product_id !== (int) $product->id) {
                             throw ValidationException::withMessages([
                                 'items' => ['Varian jumlah tidak sesuai dengan produk yang dipilih.'],
                             ]);
                         }
                     }
-                } else {
-                    // Pack langsung dari produk (tanpa variant)
-                    // Pastikan pack sesuai dengan produk
-                    if ($pack->product_id !== $product->id) {
-                        throw ValidationException::withMessages([
-                            'items' => ['Paket tidak sesuai dengan produk yang dipilih.'],
-                        ]);
-                    }
                 }
             }
 
             // Validasi variant jika ada
-            if ($variant && $variant->product_id !== $product->id) {
+            if ($variant && (int) $variant->product_id !== (int) $product->id) {
                 throw ValidationException::withMessages([
                     'items' => ['Varian yang dipilih tidak sesuai dengan produk.'],
                 ]);
