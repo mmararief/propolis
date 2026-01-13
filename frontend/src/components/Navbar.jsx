@@ -13,6 +13,11 @@ const Navbar = () => {
   const { items } = useCart();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -27,7 +32,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-full py-2">
           {/* Brand */}
           <div className="flex flex-col gap-1 items-end">
-            <div 
+            <div
               className="text-[28px] md:text-[32px] leading-none text-right"
               style={{ fontFamily: "'Racing Sans One', Helvetica, sans-serif" }}
             >
@@ -36,18 +41,18 @@ const Navbar = () => {
             </div>
             <div className="text-[9px] md:text-[11px] font-ui text-right">
               <span className="text-black">Distributor Resmi </span>
-              <span 
-                style={{ 
+              <span
+                style={{
                   fontFamily: "'Racing Sans One', Helvetica, sans-serif",
-                  color: '#D2001A' 
+                  color: '#D2001A'
                 }}
               >
                 DANTE{' '}
               </span>
-              <span 
-                style={{ 
+              <span
+                style={{
                   fontFamily: "'Racing Sans One', Helvetica, sans-serif",
-                  color: '#093FB4' 
+                  color: '#093FB4'
                 }}
               >
                 PROPOLIS
@@ -60,8 +65,7 @@ const Navbar = () => {
             <NavLink
               to="/"
               className={({ isActive }) =>
-                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${
-                  isActive ? '' : 'text-black'
+                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${isActive ? '' : 'text-black'
                 }`
               }
               style={({ isActive }) => ({
@@ -73,8 +77,7 @@ const Navbar = () => {
             <NavLink
               to="/about"
               className={({ isActive }) =>
-                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${
-                  isActive ? '' : 'text-black'
+                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${isActive ? '' : 'text-black'
                 }`
               }
               style={({ isActive }) => ({
@@ -86,8 +89,7 @@ const Navbar = () => {
             <NavLink
               to="/products"
               className={({ isActive }) =>
-                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${
-                  isActive ? '' : 'text-black'
+                `font-ui font-bold text-[15px] xl:text-[16px] h-8 flex items-center hover:opacity-80 transition-opacity duration-200 ${isActive ? '' : 'text-black'
                 }`
               }
               style={({ isActive }) => ({
@@ -179,14 +181,128 @@ const Navbar = () => {
             <button
               type="button"
               className="text-black text-2xl"
-              onClick={() => {
-                // Mobile menu toggle logic can be added here
-              }}
+              onClick={toggleMobileMenu}
             >
-              ☰
+              {isMobileMenuOpen ? '✕' : '☰'}
             </button>
           </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden absolute top-[70px] left-0 w-full bg-white shadow-md py-4 px-4 flex flex-col gap-4 border-t border-gray-100">
+            {/* Search - Mobile */}
+            <form onSubmit={handleSearch} className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50">
+              <img
+                src={searchIcon}
+                alt="Cari"
+                className="w-5 h-5 object-cover opacity-50"
+              />
+              <input
+                type="text"
+                placeholder="Cari Produk..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full font-ui text-[16px] text-black outline-none bg-transparent placeholder:text-gray-400"
+              />
+            </form>
+
+            <div className="flex flex-col gap-2">
+              <NavLink
+                to="/"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `font-ui font-bold text-[16px] py-2 border-b border-gray-50 ${isActive ? 'text-[#D2001A]' : 'text-black'
+                  }`
+                }
+              >
+                Beranda
+              </NavLink>
+              <NavLink
+                to="/about"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `font-ui font-bold text-[16px] py-2 border-b border-gray-50 ${isActive ? 'text-[#D2001A]' : 'text-black'
+                  }`
+                }
+              >
+                Tentang Kami
+              </NavLink>
+              <NavLink
+                to="/products"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `font-ui font-bold text-[16px] py-2 border-b border-gray-50 ${isActive ? 'text-[#D2001A]' : 'text-black'
+                  }`
+                }
+              >
+                Produk
+              </NavLink>
+            </div>
+
+            {/* Auth Buttons - Mobile */}
+            <div className="flex flex-col gap-3 mt-2">
+              {user ? (
+                <>
+                  <Link
+                    to="/cart"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 font-ui font-bold text-[16px] text-black py-2"
+                  >
+                    <img src={cartIcon} alt="Cart" className="w-6 h-6" />
+                    Keranjang ({items.length})
+                  </Link>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 font-ui font-bold text-[16px] text-black py-2"
+                  >
+                    <img src={profileIcon} alt="Profile" className="w-6 h-6" />
+                    Profil Saya
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="font-ui font-bold text-[16px] text-[#D2001A] py-2"
+                    >
+                      Halaman Admin
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="font-ui font-bold text-[16px] text-left text-red-600 py-2"
+                  >
+                    Keluar
+                  </button>
+                </>
+              ) : (
+                <div className="flex gap-3 mt-2">
+                  <Link
+                    to="/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex-1 h-10 rounded-full flex items-center justify-center font-ui font-bold text-white"
+                    style={{ backgroundColor: '#D2001A' }}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex-1 h-10 rounded-full flex items-center justify-center font-ui font-bold text-white"
+                    style={{ backgroundColor: '#D2001A' }}
+                  >
+                    Daftar
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
