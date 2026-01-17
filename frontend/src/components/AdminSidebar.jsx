@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const AdminSidebar = () => {
+const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -88,8 +89,58 @@ const AdminSidebar = () => {
     return location.pathname.startsWith(path);
   };
 
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    if (isOpen && window.innerWidth < 1024 && onClose) {
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const handleLinkClick = () => {
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
+  };
+
   return (
-    <aside className="w-[280px] h-screen bg-gradient-to-b from-[#D2001A] to-[#6C000D] fixed left-0 top-0 flex flex-col z-50">
+    <>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`w-[280px] h-screen bg-gradient-to-b from-[#D2001A] to-[#6C000D] fixed left-0 top-0 flex flex-col z-50 transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+      {/* Close Button for Mobile */}
+      <button
+        onClick={onClose}
+        className="lg:hidden absolute top-4 right-4 p-2 text-white hover:bg-white/20 rounded-md transition-colors"
+        aria-label="Close menu"
+      >
+        <svg
+          className="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+
       {/* Header */}
       <header className="mt-8 px-4 w-full flex flex-col items-center">
         <h1
@@ -131,6 +182,7 @@ const AdminSidebar = () => {
             <Link
               key={item.id}
               to={item.path}
+              onClick={handleLinkClick}
               className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${active ? 'bg-[#ff2c2c]' : 'bg-transparent hover:bg-[#ff5a5a]'
                 }`}
               aria-current={active ? 'page' : undefined}
@@ -177,6 +229,7 @@ const AdminSidebar = () => {
         </button>
       </div>
     </aside>
+    </>
   );
 };
 

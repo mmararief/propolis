@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { SkeletonProgressBar, SkeletonText, SkeletonButton } from '../components/Skeleton';
@@ -11,6 +11,7 @@ const OrderSuccessPage = () => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [fileSizeError, setFileSizeError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [animateProgress, setAnimateProgress] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(null);
@@ -121,12 +122,55 @@ const OrderSuccessPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.status, order?.ordered_at, order?.created_at, orderId]);
 
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0] ?? null;
+    setFileSizeError(null);
+    setError(null);
+    
+    if (!selectedFile) {
+      setFile(null);
+      return;
+    }
+
+    // Validasi ukuran file (2 MB = 2 * 1024 * 1024 bytes)
+    const maxSize = 2 * 1024 * 1024; // 2 MB dalam bytes
+    if (selectedFile.size > maxSize) {
+      const fileSizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
+      setFileSizeError(`Ukuran file terlalu besar (${fileSizeMB} MB). Maksimal ukuran file adalah 2 MB.`);
+      setFile(null);
+      // Reset input file
+      e.target.value = '';
+      return;
+    }
+
+    // Validasi tipe file
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(selectedFile.type)) {
+      setFileSizeError('Format file tidak didukung. Gunakan format JPG, PNG, atau PDF.');
+      setFile(null);
+      e.target.value = '';
+      return;
+    }
+
+    setFile(selectedFile);
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file) return;
+    
+    // Validasi ulang sebelum upload
+    const maxSize = 2 * 1024 * 1024; // 2 MB
+    if (file.size > maxSize) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      setFileSizeError(`Ukuran file terlalu besar (${fileSizeMB} MB). Maksimal ukuran file adalah 2 MB.`);
+      return;
+    }
+
     setUploading(true);
     setError(null);
     setMessage(null);
+    setFileSizeError(null);
     try {
       const formData = new FormData();
       formData.append('bukti', file);
@@ -370,23 +414,23 @@ const OrderSuccessPage = () => {
     <div className="relative bg-white min-h-screen overflow-x-hidden pt-[100px] pb-20">
       <div className="relative w-full max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-[150px] pt-16">
         {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 mb-4 sm:mb-8 flex-wrap">
           <Link
             to="/"
-            className="font-ui font-normal text-[16px] text-black hover:opacity-70 transition-colors"
+            className="font-ui font-normal text-xs sm:text-[16px] text-black hover:opacity-70 transition-colors"
           >
             Beranda
           </Link>
-          <span className="font-ui font-normal text-[16px] text-black"> &gt; </span>
+          <span className="font-ui font-normal text-xs sm:text-[16px] text-black"> &gt; </span>
           <Link
             to="/orders"
-            className="font-ui font-normal text-[16px] text-black hover:opacity-70 transition-colors"
+            className="font-ui font-normal text-xs sm:text-[16px] text-black hover:opacity-70 transition-colors"
           >
             Pesanan
           </Link>
-          <span className="font-ui font-normal text-[16px] text-black"> &gt; </span>
+          <span className="font-ui font-normal text-xs sm:text-[16px] text-black"> &gt; </span>
           <span
-            className="font-ui font-normal text-[16px]"
+            className="font-ui font-normal text-xs sm:text-[16px]"
             style={{ color: '#D2001A' }}
           >
             Detail Pesanan
@@ -394,15 +438,15 @@ const OrderSuccessPage = () => {
         </div>
 
         {/* Order Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <p className="font-ui font-bold text-lg text-gray-900">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <p className="font-ui font-bold text-base sm:text-lg text-gray-900">
                 NO. PESANAN {order.id}
               </p>
-              <div className="w-px h-6 bg-gray-300"></div>
+              <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
               <p
-                className="font-ui font-semibold text-base"
+                className="font-ui font-semibold text-sm sm:text-base"
                 style={{ color: '#D2001A' }}
               >
                 {getStatusText(order.status)}
@@ -412,15 +456,15 @@ const OrderSuccessPage = () => {
 
           {/* Countdown Timer - hanya tampil jika status belum_dibayar atau expired */}
           {(order.status === 'belum_dibayar' || order.status === 'expired') && (
-            <div className={`mb-6 p-4 rounded-lg border-2 ${
+            <div className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg border-2 ${
               isExpired || order.status === 'expired' || (timeRemaining && timeRemaining.hours === 0 && timeRemaining.minutes < 5)
                 ? 'bg-red-50 border-red-300'
                 : 'bg-yellow-50 border-yellow-300'
             }`}>
-              <div className="flex items-center gap-3">
+              <div className="flex items-start sm:items-center gap-2 sm:gap-3">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className={`h-6 w-6 ${isExpired || order.status === 'expired' ? 'text-red-600' : 'text-yellow-600'}`}
+                  className={`h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 mt-0.5 sm:mt-0 ${isExpired || order.status === 'expired' ? 'text-red-600' : 'text-yellow-600'}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -432,47 +476,47 @@ const OrderSuccessPage = () => {
                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   {isExpired || order.status === 'expired' ? (
                     <div>
-                      <p className="font-ui font-bold text-red-700 text-lg mb-1">
+                      <p className="font-ui font-bold text-red-700 text-sm sm:text-lg mb-1">
                         ⚠️ Waktu Pembayaran Telah Habis
                       </p>
-                      <p className="font-ui text-sm text-red-600">
+                      <p className="font-ui text-xs sm:text-sm text-red-600">
                         Pesanan Anda telah kadaluwarsa. Silakan buat pesanan baru.
                       </p>
                     </div>
                   ) : timeRemaining ? (
                     <div>
-                      <p className="font-ui font-semibold text-gray-900 mb-1">
+                      <p className="font-ui font-semibold text-gray-900 mb-1 text-xs sm:text-sm">
                         Waktu Tersisa untuk Pembayaran:
                       </p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <div className="flex items-center gap-1">
-                          <span className="font-ui font-bold text-2xl" style={{ color: '#D2001A' }}>
+                          <span className="font-ui font-bold text-xl sm:text-2xl" style={{ color: '#D2001A' }}>
                             {String(timeRemaining.hours).padStart(2, '0')}
                           </span>
                           <span className="font-ui text-gray-600">:</span>
-                          <span className="font-ui font-bold text-2xl" style={{ color: '#D2001A' }}>
+                          <span className="font-ui font-bold text-xl sm:text-2xl" style={{ color: '#D2001A' }}>
                             {String(timeRemaining.minutes).padStart(2, '0')}
                           </span>
                           <span className="font-ui text-gray-600">:</span>
-                          <span className="font-ui font-bold text-2xl" style={{ color: '#D2001A' }}>
+                          <span className="font-ui font-bold text-xl sm:text-2xl" style={{ color: '#D2001A' }}>
                             {String(timeRemaining.seconds).padStart(2, '0')}
                           </span>
                         </div>
-                        <span className="font-ui text-sm text-gray-600">
+                        <span className="font-ui text-xs sm:text-sm text-gray-600">
                           ({timeRemaining.hours} jam {timeRemaining.minutes} menit {timeRemaining.seconds} detik)
                         </span>
                       </div>
                       {timeRemaining.hours === 0 && timeRemaining.minutes < 5 && (
-                        <p className="font-ui text-sm text-red-600 mt-2">
+                        <p className="font-ui text-xs sm:text-sm text-red-600 mt-2">
                           ⚠️ Waktu pembayaran akan segera habis! Segera lakukan pembayaran.
                         </p>
                       )}
                     </div>
                   ) : (
-                    <p className="font-ui text-sm text-gray-600">Menghitung waktu tersisa...</p>
+                    <p className="font-ui text-xs sm:text-sm text-gray-600">Menghitung waktu tersisa...</p>
                   )}
                 </div>
               </div>
@@ -480,67 +524,153 @@ const OrderSuccessPage = () => {
           )}
 
           {/* Progress Bar */}
-          <div className="relative py-6 px-12">
-            {/* Container untuk garis yang dibatasi */}
-            <div className="relative">
-              {/* Garis dasar (abu) - hanya antar bulatan */}
-              <div 
-                className="absolute top-10 h-1 bg-gray-200" 
-                style={{ 
-                  left: '40px',
-                  right: '40px'
-                }}
-              />
-              {/* Garis progress (merah) dengan animasi */}
-              <div
-                className="absolute top-10 h-1 bg-[#D2001A] transition-all duration-1500 ease-out"
-                style={{ 
-                  left: '40px',
-                  width: animateProgress ? `calc(${completedWidthPercent}% - 80px)` : '0',
-                  transformOrigin: 'left center'
-                }}
-              />
-              {/* Titik status */}
-              <div className="relative flex items-center justify-between">
-                {steps.map((step, index) => (
-                  <div 
-                    key={step.id} 
-                    className="flex flex-col items-center"
-                    style={{
-                      animation: animateProgress ? `fadeInUp 0.6s ease-out ${index * 0.15}s both` : 'none'
-                    }}
-                  >
-                    <div
-                      className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 border-4 shadow-md transition-all duration-500 ${
-                        step.completed
-                          ? 'text-white border-[#D2001A] scale-100'
-                          : 'text-gray-400 border-gray-300 bg-white scale-90'
-                      }`}
-                      style={
-                        step.completed
-                          ? { 
-                              backgroundColor: '#D2001A',
-                              animation: 'pulse 2s ease-in-out infinite'
-                            }
-                          : {}
-                      }
+          <div className="relative py-4 sm:py-6 px-2 sm:px-6 lg:px-12">
+            {/* Desktop Layout */}
+            <div className="hidden lg:block relative">
+              {/* Container untuk garis yang dibatasi */}
+              <div className="relative">
+                {/* Garis dasar (abu) - hanya antar bulatan */}
+                <div 
+                  className="absolute top-10 h-1 bg-gray-200" 
+                  style={{ 
+                    left: '40px',
+                    right: '40px'
+                  }}
+                />
+                {/* Garis progress (merah) dengan animasi */}
+                <div
+                  className="absolute top-10 h-1 bg-[#D2001A] transition-all duration-1500 ease-out"
+                  style={{ 
+                    left: '40px',
+                    width: animateProgress ? `calc(${completedWidthPercent}% - 80px)` : '0',
+                    transformOrigin: 'left center'
+                  }}
+                />
+                {/* Titik status */}
+                <div className="relative flex items-center justify-between">
+                  {steps.map((step, index) => (
+                    <div 
+                      key={step.id} 
+                      className="flex flex-col items-center"
+                      style={{
+                        animation: animateProgress ? `fadeInUp 0.6s ease-out ${index * 0.15}s both` : 'none'
+                      }}
                     >
-                      {step.icon}
-                    </div>
-                    <p
-                      className={`font-ui font-semibold text-sm text-center mb-1 transition-colors duration-300 ${
-                        step.completed ? 'text-gray-900' : 'text-gray-400'
-                      }`}
-                    >
-                      {step.label}
-                    </p>
-                    {step.date && (
-                      <p className="font-ui text-xs text-gray-500 text-center animate-fade-in">
-                        {formatDate(step.date)}
+                      <div
+                        className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 border-4 shadow-md transition-all duration-500 ${
+                          step.completed
+                            ? 'text-white border-[#D2001A] scale-100'
+                            : 'text-gray-400 border-gray-300 bg-white scale-90'
+                        }`}
+                        style={
+                          step.completed
+                            ? { 
+                                backgroundColor: '#D2001A',
+                                animation: 'pulse 2s ease-in-out infinite'
+                              }
+                            : {}
+                        }
+                      >
+                        {step.icon}
+                      </div>
+                      <p
+                        className={`font-ui font-semibold text-sm text-center mb-1 transition-colors duration-300 ${
+                          step.completed ? 'text-gray-900' : 'text-gray-400'
+                        }`}
+                      >
+                        {step.label}
                       </p>
-                    )}
-                  </div>
-                ))}
+                      {step.date && (
+                        <p className="font-ui text-xs text-gray-500 text-center animate-fade-in">
+                          {formatDate(step.date)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile/Tablet Layout - Vertical */}
+            <div className="lg:hidden relative">
+              <div className="space-y-4">
+                {steps.map((step, index) => {
+                  const isLast = index === steps.length - 1;
+                  return (
+                    <div 
+                      key={step.id} 
+                      className="flex items-start gap-3"
+                      style={{
+                        animation: animateProgress ? `fadeInUp 0.6s ease-out ${index * 0.15}s both` : 'none'
+                      }}
+                    >
+                      {/* Vertical Line */}
+                      {!isLast && (
+                        <div className="flex flex-col items-center pt-2">
+                          <div
+                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center border-2 sm:border-3 shadow-md transition-all duration-500 flex-shrink-0 ${
+                              step.completed
+                                ? 'text-white border-[#D2001A]'
+                                : 'text-gray-400 border-gray-300 bg-white'
+                            }`}
+                            style={
+                              step.completed
+                                ? { 
+                                    backgroundColor: '#D2001A'
+                                  }
+                                : {}
+                            }
+                          >
+                            {React.cloneElement(step.icon, { className: 'w-4 h-4 sm:w-5 sm:h-5' })}
+                          </div>
+                          <div
+                            className={`w-0.5 flex-1 mt-2 ${
+                              step.completed && steps[index + 1]?.completed
+                                ? 'bg-[#D2001A]'
+                                : 'bg-gray-200'
+                            }`}
+                            style={{ minHeight: '40px' }}
+                          />
+                        </div>
+                      )}
+                      {isLast && (
+                        <div className="flex flex-col items-center pt-2">
+                          <div
+                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center border-2 sm:border-3 shadow-md transition-all duration-500 flex-shrink-0 ${
+                              step.completed
+                                ? 'text-white border-[#D2001A]'
+                                : 'text-gray-400 border-gray-300 bg-white'
+                            }`}
+                            style={
+                              step.completed
+                                ? { 
+                                    backgroundColor: '#D2001A'
+                                  }
+                                : {}
+                            }
+                          >
+                            {React.cloneElement(step.icon, { className: 'w-4 h-4 sm:w-5 sm:h-5' })}
+                          </div>
+                        </div>
+                      )}
+                      {/* Content */}
+                      <div className="flex-1 pt-1 pb-4">
+                        <p
+                          className={`font-ui font-semibold text-xs sm:text-sm mb-1 transition-colors duration-300 ${
+                            step.completed ? 'text-gray-900' : 'text-gray-400'
+                          }`}
+                        >
+                          {step.label}
+                        </p>
+                        {step.date && (
+                          <p className="font-ui text-xs text-gray-500 animate-fade-in">
+                            {formatDate(step.date)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -585,25 +715,25 @@ const OrderSuccessPage = () => {
         </div>
 
         {/* Main Content - 2 Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* Left Column - Shipping Address */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-ui font-semibold mb-4 text-gray-900">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-ui font-semibold mb-3 sm:mb-4 text-gray-900">
               Alamat Pengiriman
             </h2>
             <div className="space-y-2">
-              <p className="font-ui font-medium text-gray-900">
+              <p className="font-ui font-medium text-sm sm:text-base text-gray-900">
                 {order.phone ? `(+62) ${order.phone.replace(/^0/, '')}` : '-'}
               </p>
-              <p className="font-ui text-gray-700">
+              <p className="font-ui text-xs sm:text-sm text-gray-700 break-words">
                 {order.address || 'Alamat tidak tersedia'}
               </p>
             </div>
           </div>
 
           {/* Right Column - Products */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-ui font-semibold mb-4 text-gray-900">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-ui font-semibold mb-3 sm:mb-4 text-gray-900">
               Produk yang dibeli
             </h2>
             <div className="space-y-4">
@@ -633,9 +763,9 @@ const OrderSuccessPage = () => {
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-4 pb-4 border-b last:border-0 last:pb-0"
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pb-4 border-b last:border-0 last:pb-0"
                   >
-                    <div className="w-16 h-16 bg-[#f1f1f1] rounded flex items-center justify-center shrink-0 overflow-hidden relative">
+                    <div className="w-16 h-16 bg-[#f1f1f1] rounded flex items-center justify-center shrink-0 overflow-hidden relative self-start sm:self-center">
                       {item.product?.gambar ? (
                         <>
                           <img
@@ -653,25 +783,25 @@ const OrderSuccessPage = () => {
                         <span className="text-xs text-slate-400">Gambar</span>
                       )}
                     </div>
-                    <div className="grow">
-                      <p className="font-ui font-medium text-gray-900 mb-1">
+                    <div className="grow min-w-0">
+                      <p className="font-ui font-medium text-sm sm:text-base text-gray-900 mb-1 break-words">
                         {item.product?.nama_produk ?? item.product_id}
                       </p>
                       {(variantLabel || packLabel) && (
                         <div className="mb-1 text-xs text-slate-600 space-y-0.5">
                           {variantLabel && (
-                            <p>
+                            <p className="break-words">
                               <span className="font-semibold">Varian:</span> {variantLabel}
                             </p>
                           )}
                           {packLabel && (
-                            <p>
+                            <p className="break-words">
                               <span className="font-semibold">Paket:</span> {packLabel}
                             </p>
                           )}
                         </div>
                       )}
-                      <p className="font-ui text-sm text-gray-500">
+                      <p className="font-ui text-xs sm:text-sm text-gray-500">
                         {item.product_variant_pack?.pack_size ? (
                           <>
                             {packQuantity} paket × {item.product_variant_pack.pack_size} botol = {item.jumlah} botol
@@ -681,14 +811,14 @@ const OrderSuccessPage = () => {
                         )}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-ui font-semibold text-gray-900">
+                    <div className="text-left sm:text-right flex-shrink-0">
+                      <p className="font-ui font-semibold text-sm sm:text-base text-gray-900">
                         {formatPrice(packPrice)}
                       </p>
                       {item.product_variant_pack?.pack_size && (
                         <p className="font-ui text-xs text-gray-500">per paket</p>
                       )}
-                      <p className="font-ui font-medium text-gray-700 mt-1">
+                      <p className="font-ui font-medium text-xs sm:text-sm text-gray-700 mt-1">
                         Total: {formatPrice(totalPrice)}
                       </p>
                     </div>
@@ -701,54 +831,54 @@ const OrderSuccessPage = () => {
 
         {/* Tracking History */}
         {order.resi && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-ui font-semibold text-gray-900">Riwayat Pengiriman</h2>
-                <p className="text-sm text-gray-500">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+              <div className="flex-1">
+                <h2 className="text-lg sm:text-xl font-ui font-semibold text-gray-900 mb-1">Riwayat Pengiriman</h2>
+                <p className="text-xs sm:text-sm text-gray-500">
                   Update terakhir: {order.tracking_last_checked_at ? formatDate(order.tracking_last_checked_at) : 'Belum ada'}
                 </p>
               </div>
               {order.resi && (
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <p className="text-xs uppercase text-gray-500">Nomor Resi</p>
-                  <p className="font-mono font-semibold text-gray-900">{order.resi}</p>
+                  <p className="font-mono font-semibold text-sm sm:text-base text-gray-900 break-all">{order.resi}</p>
                 </div>
               )}
             </div>
             {trackingSummary && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-gray-700">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6 text-xs sm:text-sm text-gray-700">
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Kurir</p>
-                  <p className="font-semibold">{trackingSummary.courier || `${order.courier ?? '-'} ${order.courier_service ?? ''}`}</p>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Kurir</p>
+                  <p className="font-semibold break-words">{trackingSummary.courier || `${order.courier ?? '-'} ${order.courier_service ?? ''}`}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Layanan</p>
-                  <p className="font-semibold">{trackingSummary.service || '-'}</p>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Layanan</p>
+                  <p className="font-semibold break-words">{trackingSummary.service || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Status Terkini</p>
-                  <p className="font-semibold text-[#D2001A]">{trackingSummary.status || order.tracking_status || '-'}</p>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Status Terkini</p>
+                  <p className="font-semibold text-[#D2001A] break-words">{trackingSummary.status || order.tracking_status || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Berat / Biaya</p>
-                  <p className="font-semibold">{trackingSummary.weight || '-'} • {trackingSummary.amount || '-'}</p>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Berat / Biaya</p>
+                  <p className="font-semibold break-words">{trackingSummary.weight || '-'} • {trackingSummary.amount || '-'}</p>
                 </div>
               </div>
             )}
             {trackingHistory.length === 0 ? (
-              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-600">
+              <div className="bg-slate-50 rounded-lg p-3 sm:p-4 text-xs sm:text-sm text-slate-600">
                 Belum ada riwayat pelacakan. Status akan muncul otomatis setelah kurir memperbarui data.
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {trackingHistory.map((entry, index) => (
-                  <div key={`${entry.date}-${index}`} className="flex gap-4">
-                    <div className="w-32 text-xs text-gray-500">{entry.date ? formatDate(entry.date) : '-'}</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{entry.desc || '-'}</p>
+                  <div key={`${entry.date}-${index}`} className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                    <div className="w-full sm:w-32 text-xs text-gray-500 flex-shrink-0">{entry.date ? formatDate(entry.date) : '-'}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900 break-words">{entry.desc || '-'}</p>
                       {entry.location && (
-                        <p className="text-xs text-gray-500 mt-1">{entry.location}</p>
+                        <p className="text-xs text-gray-500 mt-1 break-words">{entry.location}</p>
                       )}
                     </div>
                   </div>
@@ -759,25 +889,25 @@ const OrderSuccessPage = () => {
         )}
 
         {/* Order Summary */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-ui font-semibold mb-4 text-gray-900">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-ui font-semibold mb-3 sm:mb-4 text-gray-900">
             Ringkasan Pesanan
           </h2>
-          <div className="space-y-3">
-            <div className="flex justify-between font-ui text-gray-700">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="flex justify-between font-ui text-gray-700 text-sm sm:text-base">
               <span>Subtotal Produk</span>
               <span>{formatPrice(subtotal)}</span>
             </div>
-            <div className="flex justify-between font-ui text-gray-700">
+            <div className="flex justify-between font-ui text-gray-700 text-sm sm:text-base">
               <span>Subtotal Pengiriman</span>
               <span>{formatPrice(order.ongkos_kirim || 0)}</span>
             </div>
             <hr className="border-gray-200" />
-            <div className="flex justify-between font-ui font-bold text-lg" style={{ color: '#D2001A' }}>
+            <div className="flex justify-between font-ui font-bold text-base sm:text-lg" style={{ color: '#D2001A' }}>
               <span>Total Pesanan</span>
               <span>{formatPrice(order.total || 0)}</span>
             </div>
-            <div className="flex justify-between font-ui text-gray-700 mt-4">
+            <div className="flex justify-between font-ui text-gray-700 mt-3 sm:mt-4 text-sm sm:text-base">
               <span>Metode Pembayaran</span>
               <span className="font-semibold">{order.metode_pembayaran || 'BCA'}</span>
             </div>
@@ -785,11 +915,11 @@ const OrderSuccessPage = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
           {['belum_dibayar', 'menunggu_konfirmasi'].includes(order.status) && (
             <button
               onClick={cancelOrder}
-              className="px-6 py-3 border-2 rounded-lg font-ui font-semibold text-[16px] transition-colors hover:bg-red-50"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 border-2 rounded-lg font-ui font-semibold text-sm sm:text-[16px] transition-colors hover:bg-red-50"
               style={{ borderColor: '#DC2626', color: '#DC2626' }}
             >
               Batalkan Pesanan
@@ -800,7 +930,7 @@ const OrderSuccessPage = () => {
               href={order.bukti_pembayaran_url}
               target="_blank"
               rel="noreferrer"
-              className="px-6 py-3 border-2 rounded-lg font-ui font-semibold text-[16px] transition-colors hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 border-2 rounded-lg font-ui font-semibold text-sm sm:text-[16px] transition-colors hover:bg-gray-50 text-center"
               style={{ borderColor: '#D2001A', color: '#D2001A' }}
             >
               Lihat Bukti
@@ -808,7 +938,7 @@ const OrderSuccessPage = () => {
           )}
           <button
             onClick={() => window.print()}
-            className="px-6 py-3 rounded-lg font-ui font-semibold text-[16px] text-white hover:opacity-90 transition-opacity"
+            className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-ui font-semibold text-sm sm:text-[16px] text-white hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#D2001A' }}
           >
             Cetak Tagihan
@@ -818,32 +948,64 @@ const OrderSuccessPage = () => {
         {/* Upload Proof Section (if not uploaded yet and order is still valid) */}
         {!order.bukti_pembayaran_url && 
          order.status === 'belum_dibayar' && (
-          <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-            <h2 className="text-xl font-ui font-semibold mb-4 text-gray-900">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mt-4 sm:mt-6">
+            <h2 className="text-lg sm:text-xl font-ui font-semibold mb-3 sm:mb-4 text-gray-900">
               Upload Bukti Pembayaran
             </h2>
+            <p className="text-xs sm:text-sm text-gray-600 mb-3">
+              Format: JPG, PNG, atau PDF. Ukuran maksimal: <span className="font-semibold">2 MB</span>
+            </p>
             <form onSubmit={handleUpload} className="space-y-3">
               <div>
                 <input
                   type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-ui text-sm focus:outline-none focus:ring-2 focus:ring-offset-0"
+                  accept="image/jpeg,image/jpg,image/png,.pdf,application/pdf"
+                  onChange={handleFileChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-ui text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-offset-0"
                   style={{ focusRingColor: '#D2001A', focusBorderColor: '#D2001A' }}
                   required
                   disabled={order.status === 'expired' || order.status === 'dibatalkan'}
                 />
+                {file && (
+                  <p className="mt-2 text-xs sm:text-sm text-gray-600 font-ui">
+                    File dipilih: <span className="font-semibold">{file.name}</span> ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+                  </p>
+                )}
               </div>
-              {error && <p className="text-red-500 text-sm font-ui">{error}</p>}
+              {fileSizeError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-red-800 text-xs sm:text-sm font-ui flex items-start gap-2">
+                    <svg
+                      className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span>{fileSizeError}</span>
+                  </p>
+                </div>
+              )}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-red-800 text-xs sm:text-sm font-ui">{error}</p>
+                </div>
+              )}
               {message && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-green-800 text-sm font-ui">{message}</p>
+                  <p className="text-green-800 text-xs sm:text-sm font-ui">{message}</p>
                 </div>
               )}
               <button
                 type="submit"
-                disabled={uploading || !file}
-                className="px-6 py-3 rounded-lg font-ui font-semibold text-[16px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={uploading || !file || !!fileSizeError}
+                className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-ui font-semibold text-sm sm:text-[16px] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#D2001A' }}
               >
                 {uploading ? 'Mengunggah...' : 'Upload Bukti'}
