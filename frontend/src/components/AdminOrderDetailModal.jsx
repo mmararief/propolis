@@ -46,7 +46,8 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
 
     const initialCodes = {};
     order.items?.forEach((item) => {
-      const existingCodes = item.product_codes || [];
+      // Handle both snake_case and camelCase from Laravel API response
+      const existingCodes = item.product_codes || item.productCodes || [];
       const normalized = Array.from({ length: item.jumlah || 0 }).map((_, idx) => existingCodes[idx]?.kode_produk || '');
       initialCodes[item.id] = normalized;
     });
@@ -245,12 +246,12 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                   <p className="font-semibold text-slate-900">
                     {(order.ordered_at || order.created_at)
                       ? new Date(order.ordered_at || order.created_at).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
                       : '-'}
                   </p>
                 </div>
@@ -314,7 +315,7 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                     let packQuantity = item.jumlah;
                     let packPrice = item.harga_satuan || 0;
                     let totalPrice = item.total_harga || (packPrice * packQuantity);
-                    
+
                     if (item.product_variant_pack?.pack_size) {
                       const packSize = item.product_variant_pack.pack_size;
                       packQuantity = Math.floor(item.jumlah / packSize);
@@ -328,10 +329,10 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                         totalPrice = packPrice * packQuantity;
                       }
                     }
-                    
+
                     const variantLabel = item.product_variant?.tipe || '';
                     const packLabel = item.product_variant_pack?.label || '';
-                    
+
                     return (
                       <div
                         key={item.id}
@@ -373,36 +374,36 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                           </div>
                         </div>
 
-                      <div className="mt-4 pt-3 border-t border-slate-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-semibold text-slate-900">Kode Produk</p>
-                          <span className="text-xs text-slate-500">
-                            {canEditCodes ? 'Wajib diisi sebelum kirim' : 'Tidak dapat diubah pada status ini'}
-                          </span>
-                        </div>
-                        <div className="grid gap-2 md:grid-cols-2">
-                          {Array.from({ length: item.jumlah }).map((_, idx) => (
-                            <input
-                              key={`${item.id}-code-${idx}`}
-                              type="text"
-                              value={codeInputs[item.id]?.[idx] ?? ''}
-                              onChange={(e) => handleCodeInputChange(item.id, idx, e.target.value)}
-                              disabled={!canEditCodes}
-                              className="input-field font-mono text-sm"
-                              placeholder={`Kode produk #${idx + 1}`}
-                            />
-                          ))}
-                        </div>
-                        {item.product_codes?.length > 0 && !canEditCodes && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            Kode tersimpan: {item.product_codes.map((code) => code.kode_produk).join(', ')}
-                                        </p>
-                                      )}
-                                </div>
-                              </div>
-                            );
-                          })}
+                        <div className="mt-4 pt-3 border-t border-slate-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-slate-900">Kode Produk</p>
+                            <span className="text-xs text-slate-500">
+                              {canEditCodes ? 'Wajib diisi sebelum kirim' : 'Tidak dapat diubah pada status ini'}
+                            </span>
                           </div>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            {Array.from({ length: item.jumlah }).map((_, idx) => (
+                              <input
+                                key={`${item.id}-code-${idx}`}
+                                type="text"
+                                value={codeInputs[item.id]?.[idx] ?? ''}
+                                onChange={(e) => handleCodeInputChange(item.id, idx, e.target.value)}
+                                disabled={!canEditCodes}
+                                className="input-field font-mono text-sm"
+                                placeholder={`Kode produk #${idx + 1}`}
+                              />
+                            ))}
+                          </div>
+                          {((item.product_codes || item.productCodes)?.length > 0) && !canEditCodes && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              Kode tersimpan: {(item.product_codes || item.productCodes).map((code) => code.kode_produk).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
                 {canEditCodes && order.items?.length > 0 && (
                   <div className="flex justify-end mt-4">
                     <button
@@ -413,8 +414,8 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
                     >
                       {isSavingCodes ? 'Menyimpan...' : 'Simpan Semua Kode Produk'}
                     </button>
-                        </div>
-                      )}
+                  </div>
+                )}
               </div>
 
               {/* Shipping Address */}
