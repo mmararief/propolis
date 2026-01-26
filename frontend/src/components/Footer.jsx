@@ -63,11 +63,11 @@ const Footer = () => {
                         <ul className="space-y-4 font-ui text-sm">
                             <li className="flex items-start gap-3">
                                 <span className="text-xl mt-0.5">📍</span>
-                                <span>Jl. Contoh No. 45, Jakarta</span>
+                                <span>Komplek Angkasa puri  JL. Belimbing B6 no 15, Jawa Barat</span>
                             </li>
                             <li className="flex items-center gap-3">
                                 <span className="text-xl">📞</span>
-                                <span>0812 3456 7891</span>
+                                <span>0877 8409 8190</span>
                             </li>
                             <li className="flex items-center gap-3">
                                 <span className="text-xl">✉️</span>
