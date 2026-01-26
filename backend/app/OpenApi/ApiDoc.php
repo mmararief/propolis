@@ -75,7 +75,7 @@ class CheckoutItemSchema {}
  *     @OA\Property(property="destination_subdistrict_id", type="integer", nullable=true),
  *     @OA\Property(property="address", type="string", example="Jl. Mawar no 1"),
  *     @OA\Property(property="phone", type="string", example="628123456789"),
- *     @OA\Property(property="metode_pembayaran", type="string", enum={"BCA","BSI","gopay","dana","transfer_manual"}),
+ *     @OA\Property(property="metode_pembayaran", type="string", enum={"BCA","BSI","BRI","transfer_manual"}),
  *     @OA\Property(property="ongkos_kirim", type="number", format="float", example=20000),
  *     @OA\Property(
  *         property="items",

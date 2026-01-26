@@ -73,7 +73,7 @@ class AdminOrderController extends Controller
             'external_order_id' => ['nullable', 'string', 'max:100'],
             'ordered_at' => ['nullable', 'date'],
             'status' => ['nullable', Rule::in($allowedStatuses)],
-            'metode_pembayaran' => ['nullable', 'in:BCA,BSI,gopay,dana,transfer_manual'],
+            'metode_pembayaran' => ['nullable', 'in:BCA,BSI,BRI,transfer_manual'],
             'courier' => ['nullable', 'string', 'max:50'],
             'courier_service' => ['nullable', 'string', 'max:50'],
             'shipping_cost' => ['nullable', 'numeric', 'min:0'],

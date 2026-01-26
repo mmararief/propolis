@@ -165,6 +165,26 @@ const CheckoutPage = () => {
     return `Rp ${price.toLocaleString('id-ID')}`;
   };
 
+  // Function to get bank account number based on payment method
+  const getBankAccountNumber = (paymentMethod) => {
+    const accountNumbers = {
+      'BCA': '7100161243',
+      'BSI': '7224772445',
+      'BRI': '034601005688508',
+    };
+    return accountNumbers[paymentMethod.toUpperCase()] || '-';
+  };
+
+  // Function to get account name
+  const getAccountName = (paymentMethod) => {
+    const accountNames = {
+      'BCA': 'Dante Propolis',
+      'BSI': 'Dante Propolis',
+      'BRI': 'Dante Propolis',
+    };
+    return accountNames[paymentMethod.toUpperCase()] || '-';
+  };
+
   const totalItems = selectedCount;
   const grandTotal = selectedTotal + (form.ongkos_kirim || 0);
 
@@ -612,8 +632,8 @@ const CheckoutPage = () => {
                     </span>
                     Metode Pembayaran
                   </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                    {['BCA', 'BSI', 'Gopay', 'Dana'].map((method) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                    {['BCA', 'BSI', 'BRI'].map((method) => (
                       <button
                         key={method}
                         type="button"
@@ -638,7 +658,7 @@ const CheckoutPage = () => {
                       className="font-ui font-medium mt-1"
                       style={{ color: '#D2001A' }}
                     >
-                      1234567890 a/n Dante Propolis
+                      {getBankAccountNumber(form.metode_pembayaran)} a/n {getAccountName(form.metode_pembayaran)}
                     </p>
                     <p className="text-sm font-ui mt-2" style={{ color: '#D2001A' }}>
                       Pastikan anda membayar sesuai rekening dengan benar sebelum melakukan

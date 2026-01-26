@@ -44,7 +44,7 @@ class CheckoutController extends Controller
             'destination_subdistrict_id' => ['nullable', 'integer'],
             'address' => ['nullable', 'string'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'metode_pembayaran' => ['required', 'in:BCA,BSI,gopay,dana,transfer_manual'],
+            'metode_pembayaran' => ['required', 'in:BCA,BSI,BRI,transfer_manual'],
             'ongkos_kirim' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],

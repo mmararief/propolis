@@ -34,7 +34,7 @@ return new class extends Migration
                 'dibatalkan',
                 'expired',
             ])->default('belum_dibayar');
-            $table->enum('metode_pembayaran', ['BCA', 'BSI', 'gopay', 'dana', 'transfer_manual'])->nullable();
+            $table->enum('metode_pembayaran', ['BCA', 'BSI', 'BRI', 'transfer_manual'])->nullable();
             $table->string('bukti_pembayaran')->nullable();
             $table->string('resi', 100)->nullable();
             $table->timestamp('reservation_expires_at')->nullable()->index();

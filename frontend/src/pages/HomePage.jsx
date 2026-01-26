@@ -564,7 +564,7 @@ const HomePage = () => {
                     alt=""
                     className="w-[30px] h-[30px] object-cover"
                   />
-                  <span className="text-base sm:text-lg lg:text-[20px] font-ui font-normal">Jl. Contoh No. 45, Jakarta</span>
+                  <span className="text-base sm:text-lg lg:text-[20px] font-ui font-normal">Komplek Angkasa puri  JL. Belimbing B6 no 15, Jawa Barat</span>
                 </div>
                 <div className="flex items-center gap-3 text-white">
                   <img
@@ -572,7 +572,7 @@ const HomePage = () => {
                     alt=""
                     className="w-[30px] h-[30px] object-cover"
                   />
-                  <span className="text-base sm:text-lg lg:text-[20px] font-ui font-normal">0812 3456 7891</span>
+                  <span className="text-base sm:text-lg lg:text-[20px] font-ui font-normal">0877 8409 8190</span>
                 </div>
                 <div className="flex items-center gap-3 text-white">
                   <img

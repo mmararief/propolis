@@ -25,8 +25,7 @@ const paymentOptions = [
   { value: 'transfer_manual', label: 'Transfer Manual' },
   { value: 'BCA', label: 'BCA' },
   { value: 'BSI', label: 'BSI' },
-  { value: 'gopay', label: 'GoPay' },
-  { value: 'dana', label: 'Dana' },
+  { value: 'BRI', label: 'BRI' },
 ];
 
 const generateId = () => {
