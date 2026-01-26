@@ -48,7 +48,7 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
     order.items?.forEach((item) => {
       // Handle both snake_case and camelCase from Laravel API response
       const existingCodes = item.product_codes || item.productCodes || [];
-      const normalized = Array.from({ length: item.jumlah || 0 }).map((_, idx) => existingCodes[idx]?.kode_produk || '');
+      const normalized = Array.from({ length: Number(item.jumlah) || 0 }).map((_, idx) => existingCodes[idx]?.kode_produk || '');
       initialCodes[item.id] = normalized;
     });
     setCodeInputs(initialCodes);
@@ -110,7 +110,7 @@ const AdminOrderDetailModal = ({ orderId, isOpen, onClose, onStatusUpdated }) =>
     for (const item of order.items || []) {
       const codes = Array.from(codeInputs[item.id] || []).map((code) => code.trim());
 
-      if (codes.length !== item.jumlah) {
+      if (codes.length !== Number(item.jumlah)) {
         setCodeError(`Lengkapi ${item.jumlah} kode untuk ${item.product?.nama_produk || 'produk'}`);
         return;
       }

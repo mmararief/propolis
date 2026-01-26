@@ -141,7 +141,7 @@ const AdminOrdersPage = () => {
 
   const getTotalItems = (order) => {
     if (!order.items) return 0;
-    return order.items.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+    return order.items.reduce((sum, item) => sum + (Number(item.jumlah) || 0), 0);
   };
 
   return (

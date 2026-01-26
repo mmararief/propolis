@@ -26,6 +26,7 @@ class OrderItem extends Model
         'harga_satuan' => 'decimal:2',
         'total_harga' => 'decimal:2',
         'allocated' => 'boolean',
+        'jumlah' => 'integer',
     ];
 
     protected $appends = [

@@ -349,7 +349,7 @@ class AdminOrderController extends Controller
 
         foreach ($formattedItems as $itemPayload) {
             $orderItem = $orderItems->get($itemPayload['order_item_id']);
-            if (count($itemPayload['kode_produk']) !== $orderItem->jumlah) {
+            if (count($itemPayload['kode_produk']) !== (int) $orderItem->jumlah) {
                 return $this->fail(
                     "Jumlah kode produk untuk {$orderItem->product?->nama_produk} harus {$orderItem->jumlah}",
                     422
